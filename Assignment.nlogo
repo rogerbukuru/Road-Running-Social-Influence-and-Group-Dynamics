@@ -4,10 +4,16 @@ breed [runners runner]
 
 ;define agent properties
 shoes-own [brand model durability current-distance cushioning support outsole-wear]
-runners-own [weight running-style weekly-distance surface-preference]
+runners-own [weight running-style weekly-distance surface-preference shoe-worn-out]
+
+globals [
+  road-patches
+  trail-patches
+]
 
 to setup
   clear-all
+  setup-running-track
   create-shoes num-shoes [
     set brand one-of ["Nike" "Adidas" "NewBalance"]
     set model one-of ["Pegasus" "Ultra" "FreshFormX"]
@@ -16,6 +22,8 @@ to setup
     set cushioning 100
     set support 100
     set outsole-wear 0
+    ;set shape "feet"
+    set color ifelse-value (brand = "Brand A") [red] [ifelse-value (brand = "Brand B") [blue] [green]]
     setxy random-xcor random-ycor
   ]
 
@@ -24,33 +32,61 @@ to setup
     set running-style one-of ["pronation" "supination" "neutral"]
     set weekly-distance random-normal 20 5
     set surface-preference one-of ["road" "trail" "mixed"]
+    set shoe-worn-out false
+    set shape "person"
+    set size 2
+    set color white
     setxy random-xcor random-ycor
   ]
   reset-ticks
 end
 
+
+to setup-running-track
+  ask patches [
+    set pcolor green
+  ]
+  set road-patches patches with [pxcor >= -10 and pxcor <= 10]
+  set trail-patches patches with [pxcor < -10 or pxcor > 10]
+  ask road-patches [
+    set pcolor gray
+  ]
+  ask trail-patches [
+    set pcolor brown
+  ]
+end
+
 to go
   ask runners [
     let assigned-shoe one-of shoes
-    let dist weekly-distance
-    ask assigned-shoe [
-      set current-distance current-distance + dist
-      set cushioning cushioning - dist / 100
-      set support support - dist / 100
-      set outsole-wear outsole-wear + dist / 50
+    let distance-ran weekly-distance
+    let surface-type ifelse-value(surface-preference = "random")[
+      one-of ["road" "trail"]
+    ][
+      surface-preference
     ]
+    ask assigned-shoe [
+      set current-distance current-distance + distance-ran
+      set cushioning cushioning - distance-ran / 100
+      set support support - distance-ran / 100
+      ifelse surface-type = "road" [
+      set outsole-wear outsole-wear + distance-ran / 50
+    ][
+       set outsole-wear outsole-wear + distance-ran / 30
+      ]
+  ]
   ]
   tick
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 485
-10
-922
-448
+15
+1072
+603
 -1
 -1
-13.0
+17.55
 1
 10
 1
