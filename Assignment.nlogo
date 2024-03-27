@@ -2,13 +2,16 @@
 breed [shoes shoe]
 breed [runners runner]
 
+
 ;define agent properties
-shoes-own [brand model durability current-distance cushioning support outsole-wear]
-runners-own [weight running-style weekly-distance surface-preference shoe-worn-out]
+shoes-own [brand model durability current-distance cushioning support outsole-wear runner-id]
+runners-own [weight running-style weekly-distance surface-preference shoe-worn-out trainers shoe-id total-mileage direction]
 
 globals [
   road-patches
   trail-patches
+  patch-update-rate
+
 ]
 
 to setup
@@ -22,59 +25,133 @@ to setup
     set cushioning 100
     set support 100
     set outsole-wear 0
-    ;set shape "feet"
-    set color ifelse-value (brand = "Brand A") [red] [ifelse-value (brand = "Brand B") [blue] [green]]
+    set shape "footprint human"
+    set color ifelse-value (brand = "Nike") [red] [ifelse-value (brand = "Adidas") [blue] [green]]
     setxy random-xcor random-ycor
+    set size 2
+    set runner-id -1 ; unassigned shoe
   ]
 
   create-runners num-runners [
     set weight random-normal 75 10
     set running-style one-of ["pronation" "supination" "neutral"]
     set weekly-distance random-normal 20 5
-    set surface-preference one-of ["road" "trail" "mixed"]
+    set surface-preference "road";one-of ["road" "trail"]
     set shoe-worn-out false
     set shape "person"
     set size 2
     set color white
+    set trainers one-of shoes with [not any? runners-here]; assuming shoes are scattered and need to be picked up
     setxy random-xcor random-ycor
+    set shoe-id -1
+    set total-mileage 0
+    set direction -1 ;one-of [1 -1]  ; Set the initial direction (1 for up, -1 for down)
+    assign-shoe
   ]
+  set patch-update-rate 0.001 ; Adjust this value to control the patch update rate
+
   reset-ticks
 end
 
 
 to setup-running-track
   ask patches [
-    set pcolor green
+    set pcolor brown
   ]
   set road-patches patches with [pxcor >= -10 and pxcor <= 10]
   set trail-patches patches with [pxcor < -10 or pxcor > 10]
   ask road-patches [
     set pcolor gray
   ]
-  ask trail-patches [
-    set pcolor brown
+end
+
+
+to assign-shoe
+  let available-shoes shoes with [runner-id = -1]
+  if any? available-shoes [
+    let assigned-shoe one-of available-shoes
+    set shoe-id [who] of assigned-shoe
+    ask assigned-shoe [
+      set runner-id [who] of myself
+   ]
   ]
 end
 
 to go
   ask runners [
-    let assigned-shoe one-of shoes
-    let distance-ran weekly-distance
-    let surface-type ifelse-value(surface-preference = "random")[
-      one-of ["road" "trail"]
-    ][
-      surface-preference
-    ]
-    ask assigned-shoe [
-      set current-distance current-distance + distance-ran
-      set cushioning cushioning - distance-ran / 100
-      set support support - distance-ran / 100
-      ifelse surface-type = "road" [
-      set outsole-wear outsole-wear + distance-ran / 50
-    ][
-       set outsole-wear outsole-wear + distance-ran / 30
+    let assigned-shoe one-of shoes with [who = [shoe-id] of myself]
+    if assigned-shoe != nobody [
+      let mileage weekly-distance
+      let surface-type "road" ;ifelse-value(surface-preference = "road")[
+        ;"road"
+      ;];[
+       ; "trail"
+      ;]
+      let target-patch ifelse-value (surface-type = "road")[
+        one-of road-patches
+      ][
+       one-of trail-patches
       ]
+     ifelse surface-type = "road" [
+        set heading 0
+        forward mileage / 0.0001 * direction
+;        if ycor >= max-pycor [
+;          setxy xcor min-pycor
+;        ]
+        if ycor >= max-pycor or ycor <= min-pycor [
+         set direction -1 * direction  ; Reverse direction when reaching the top or bottom of the view
+        ]
+;        ask road-patches [
+;          if random-float 1 < patch-update-rate [
+;            set pcolor [pcolor] of patch-at 0 1
+;          ]
+;        ]
+;        ask road-patches with [pycor = max-pycor] [
+;          if random-float 1 < patch-update-rate [
+;            set pcolor gray
+;          ]
+;        ]
+      ]
+      [
+        set heading 90
+        forward mileage / 0.0001 * direction
+;         if xcor >= max-pxcor [
+;          setxy min-pxcor ycor
+;        ]
+        if xcor >= max-pxcor or xcor <= min-pxcor [
+          set direction -1 * direction  ; Reverse direction when reaching the left or right edge of the view
+        ]
+;        ask trail-patches [
+;          if random-float 1 < patch-update-rate [
+;            set pcolor [pcolor] of patch-at 1 0
+;          ]
+;        ]
+;        ask trail-patches with [pxcor = max-pxcor] [
+;          if random-float 1 < patch-update-rate [
+;            set pcolor brown
+;          ]
+;        ]
+        ]
+
+
+      ask assigned-shoe [
+        move-to [patch-here] of myself
+        set heading [heading] of myself
+        set current-distance current-distance + mileage
+        set cushioning cushioning - mileage / 100
+        set support support - mileage / 100
+        ifelse surface-type = "road" [
+          set outsole-wear outsole-wear + mileage / 50
+        ][
+          set outsole-wear outsole-wear + mileage / 30
+        ]
+      ]
+    ]
   ]
+  if all? shoes [outsole-wear >= 100 or cushioning <= 0 or support <= 0] [
+    let total-distance sum [current-distance] of shoes
+    print (word "All shoes have worn out. Total distance covered: " total-distance " miles.")
+    stop
   ]
   tick
 end
@@ -114,8 +191,8 @@ SLIDER
 num-shoes
 num-shoes
 1
-100
-10.0
+5
+2.0
 1
 1
 NIL
@@ -129,8 +206,8 @@ SLIDER
 num-runners
 num-runners
 1
-100
-10.0
+5
+2.0
 1
 1
 NIL
@@ -160,7 +237,7 @@ BUTTON
 97
 Go
 go
-NIL
+T
 1
 T
 OBSERVER
@@ -348,6 +425,14 @@ Circle -7500403 true true 96 51 108
 Circle -16777216 true false 113 68 74
 Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
+
+footprint human
+true
+0
+Polygon -7500403 true true 111 244 115 272 130 286 151 288 168 277 176 257 177 234 175 195 174 172 170 135 177 104 188 79 188 55 179 45 181 32 185 17 176 1 159 2 154 17 161 32 158 44 146 47 144 35 145 21 135 7 124 9 120 23 129 36 133 49 121 47 100 56 89 73 73 94 74 121 86 140 99 163 110 191
+Polygon -7500403 true true 97 37 101 44 111 43 118 35 111 23 100 20 95 25
+Polygon -7500403 true true 77 52 81 59 91 58 96 50 88 39 82 37 76 42
+Polygon -7500403 true true 63 72 67 79 77 78 79 70 73 63 68 60 63 65
 
 house
 false
