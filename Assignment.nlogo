@@ -1,22 +1,25 @@
 ; define agents
 breed [shoes shoe]
 breed [runners runner]
+breed [plants plant]
+breed [trees tree]
 
-
-;define agent properties
+; define agent properties
 shoes-own [brand model durability current-distance cushioning support outsole-wear runner-id]
-runners-own [weight running-style weekly-distance surface-preference shoe-worn-out trainers shoe-id total-mileage direction]
+runners-own [weight running-style weekly-distance surface-preference shoe-worn-out trainers shoe-id
+  total-mileage speed speed-category]
 
 globals [
   road-patches
-  trail-patches
-  patch-update-rate
-
+  grass-patches
+  track-radius
+  track-width
 ]
 
 to setup
   clear-all
   setup-running-track
+  setup-plants-and-trees
   create-shoes num-shoes [
     set brand one-of ["Nike" "Adidas" "NewBalance"]
     set model one-of ["Pegasus" "Ultra" "FreshFormX"]
@@ -27,7 +30,7 @@ to setup
     set outsole-wear 0
     set shape "footprint human"
     set color ifelse-value (brand = "Nike") [red] [ifelse-value (brand = "Adidas") [blue] [green]]
-    setxy random-xcor random-ycor
+    setxy 0 (track-radius - track-width / 2)
     set size 2
     set runner-id -1 ; unassigned shoe
   ]
@@ -36,32 +39,70 @@ to setup
     set weight random-normal 75 10
     set running-style one-of ["pronation" "supination" "neutral"]
     set weekly-distance random-normal 20 5
-    set surface-preference "road";one-of ["road" "trail"]
+    set surface-preference "road"
     set shoe-worn-out false
     set shape "person"
     set size 2
     set color white
-    set trainers one-of shoes with [not any? runners-here]; assuming shoes are scattered and need to be picked up
-    setxy random-xcor random-ycor
+    set trainers one-of shoes with [not any? runners-here]
+    setxy 0 (track-radius - track-width / 2)
     set shoe-id -1
     set total-mileage 0
-    set direction -1 ;one-of [1 -1]  ; Set the initial direction (1 for up, -1 for down)
+    set speed-category one-of ["slow" "medium" "fast"]
+    ifelse speed-category = "slow" [
+    set speed 0.001
+  ][
+    ifelse speed-category = "medium" [
+      set speed 0.002
+    ][
+      set speed 0.003
+    ]
+  ]
     assign-shoe
   ]
-  set patch-update-rate 0.001 ; Adjust this value to control the patch update rate
 
   reset-ticks
 end
 
-
 to setup-running-track
+  set track-radius 17.5
+  set track-width 5
+
   ask patches [
-    set pcolor brown
+    let distancee distancexy 0 0
+    ifelse distancee <= track-radius and distancee >= track-radius - track-width [
+      set pcolor 5 ; dark gray for road patches
+    ][
+      set pcolor green ; grass inside and outside the circle
+    ]
   ]
-  set road-patches patches with [pxcor >= -10 and pxcor <= 10]
-  set trail-patches patches with [pxcor < -10 or pxcor > 10]
-  ask road-patches [
-    set pcolor gray
+
+  set road-patches patches with [pcolor = 5]
+  set grass-patches patches with [pcolor = green]
+end
+
+to setup-plants-and-trees
+  let num-plants 50
+  let num-trees 20
+
+  ; Create plants
+  let available-plant-patches grass-patches with [not any? neighbors with [pcolor = 5 or pcolor = 6]]
+  ask n-of min list num-plants count available-plant-patches available-plant-patches [
+    sprout-plants 1 [
+      set shape "plant"
+      set color one-of [green brown]
+      set size 1
+    ]
+  ]
+
+  ; Create trees
+  let available-tree-patches grass-patches with [not any? neighbors with [pcolor = 5 or pcolor = 6] and not any? plants-here]
+  ask n-of min list num-trees count available-tree-patches available-tree-patches [
+    sprout-trees 1 [
+      set shape "tree"
+      set color one-of [green brown]
+      set size 2
+    ]
   ]
 end
 
@@ -82,77 +123,67 @@ to go
     let assigned-shoe one-of shoes with [who = [shoe-id] of myself]
     if assigned-shoe != nobody [
       let mileage weekly-distance
-      let surface-type "road" ;ifelse-value(surface-preference = "road")[
-        ;"road"
-      ;];[
-       ; "trail"
-      ;]
-      let target-patch ifelse-value (surface-type = "road")[
-        one-of road-patches
-      ][
-       one-of trail-patches
-      ]
-     ifelse surface-type = "road" [
-        set heading 0
-        forward mileage / 0.0001 * direction
-;        if ycor >= max-pycor [
-;          setxy xcor min-pycor
-;        ]
-        if ycor >= max-pycor or ycor <= min-pycor [
-         set direction -1 * direction  ; Reverse direction when reaching the top or bottom of the view
-        ]
-;        ask road-patches [
-;          if random-float 1 < patch-update-rate [
-;            set pcolor [pcolor] of patch-at 0 1
-;          ]
-;        ]
-;        ask road-patches with [pycor = max-pycor] [
-;          if random-float 1 < patch-update-rate [
-;            set pcolor gray
-;          ]
-;        ]
-      ]
-      [
-        set heading 90
-        forward mileage / 0.0001 * direction
-;         if xcor >= max-pxcor [
-;          setxy min-pxcor ycor
-;        ]
-        if xcor >= max-pxcor or xcor <= min-pxcor [
-          set direction -1 * direction  ; Reverse direction when reaching the left or right edge of the view
-        ]
-;        ask trail-patches [
-;          if random-float 1 < patch-update-rate [
-;            set pcolor [pcolor] of patch-at 1 0
-;          ]
-;        ]
-;        ask trail-patches with [pxcor = max-pxcor] [
-;          if random-float 1 < patch-update-rate [
-;            set pcolor brown
-;          ]
-;        ]
-        ]
+      let angle heading
+      set angle angle + speed
+      let new-xcor (track-radius - track-width / 2) * cos(angle)
+      let new-ycor (track-radius - track-width / 2) * sin(angle)
 
+      ; Check for potential collision with other runners
+      let other-runners other runners in-cone 2 90
+      ifelse any? other-runners [
+        ; Turn wide to avoid collision
+        let min-angle angle - 20
+        let max-angle angle + 20
+        set angle random-float (max-angle - min-angle) + min-angle
+        set new-xcor (track-radius - track-width / 2) * cos(angle)
+        set new-ycor (track-radius - track-width / 2) * sin(angle)
+
+        ; Check if the new position is on the track
+        let target-patch patch new-xcor new-ycor
+        while [target-patch = nobody or [pcolor] of target-patch != 5] [
+          ; Adjust angle until a valid position on the track is found
+          ifelse random 2 = 0 [
+            set angle angle + 5
+          ][
+            set angle angle - 5
+          ]
+          set new-xcor (track-radius - track-width / 2) * cos(angle)
+          set new-ycor (track-radius - track-width / 2) * sin(angle)
+          set target-patch patch new-xcor new-ycor
+        ]
+      ][
+        ; No potential collision, proceed normally
+        let target-patch patch new-xcor new-ycor
+        if target-patch != nobody and [pcolor] of target-patch != 5 [
+          ; Adjust angle to stay on the track
+          let min-angle angle - 5
+          let max-angle angle + 5
+          set angle random-float (max-angle - min-angle) + min-angle
+          set new-xcor (track-radius - track-width / 2) * cos(angle)
+          set new-ycor (track-radius - track-width / 2) * sin(angle)
+        ]
+      ]
+
+      setxy new-xcor new-ycor
+      set heading angle
 
       ask assigned-shoe [
-        move-to [patch-here] of myself
+        setxy ([xcor] of myself) ([ycor] of myself)
         set heading [heading] of myself
         set current-distance current-distance + mileage
         set cushioning cushioning - mileage / 100
         set support support - mileage / 100
-        ifelse surface-type = "road" [
-          set outsole-wear outsole-wear + mileage / 50
-        ][
-          set outsole-wear outsole-wear + mileage / 30
-        ]
+        set outsole-wear outsole-wear + mileage / 50
       ]
     ]
   ]
-  if all? shoes [outsole-wear >= 100 or cushioning <= 0 or support <= 0] [
-    let total-distance sum [current-distance] of shoes
-    print (word "All shoes have worn out. Total distance covered: " total-distance " miles.")
-    stop
-  ]
+   ; if all? shoes [outsole-wear >= 100 or cushioning <= 0 or support <= 0] [
+ ;   let total-distance sum [current-distance] of shoes
+ ;   print (word "All shoes have worn out. Total distance covered: " total-distance " miles.")
+ ;   stop
+ ; ]
+
+
   tick
 end
 @#$#@#$#@
@@ -192,7 +223,7 @@ num-shoes
 num-shoes
 1
 5
-2.0
+5.0
 1
 1
 NIL
@@ -207,7 +238,7 @@ num-runners
 num-runners
 1
 5
-2.0
+5.0
 1
 1
 NIL
