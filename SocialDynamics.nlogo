@@ -1,275 +1,211 @@
-; define agents
-breed [shoes shoe]
 breed [runners runner]
-breed [plants plant]
-breed [trees tree]
+breed [spectators spectator]
+breed [pacers pacer]
 
-; define agent properties
-shoes-own [
-  brand
-  model
-  durability
-  current-distance
-  cushioning ; higher heel drop for running shoes than trainers (added support and cushioning) more comfort during long distance runs when you need lots of shock absorption
-  support
-  outsole-wear
-  runner-id
-  shoe-type ; "Training" or "Running"
-  injury-risk
-
-  sole-flexibility
-
-  midsole-wear-tear
-  outsole-wear-tear
-  ; Anything longer than a 5K is usually better with running shoes for shock absorption. (with training shoes)
-]
 runners-own [
-  weight
-  running-style
-  weekly-distance
-  surface-preference
-  shoe-worn-out
-  trainers
-  shoe-id
-  total-mileage
   speed
-  speed-category
-  injury-status; track if a runner has suffered an injury
+  endurance
+  motivation
+  social-influence-susceptibility
+  following-pacer?
+]
+
+spectators-own [
+  cheering-intensity
+]
+
+pacers-own [
+  set-pace
+  visibility
+  group-size
 ]
 
 globals [
-  road-patches
-  grass-patches
-  track-radius
-  track-width
-  current-weaher; "Dry", "Wet"
-  selected-brands
+  race-distance
+  social-influence-radius
+  track-size
+  lawn-size
 ]
 
 to setup
-   clear-all
-  setup-running-track
-  setup-plants-and-trees
-  ; Initialize the selected-brands list based on the switch states
-  set selected-brands []
-  if nike [ set selected-brands lput "Nike" selected-brands ]
-  if adidas [ set selected-brands lput "Adidas" selected-brands ]
-  if new-balance [ set selected-brands lput "New Balance" selected-brands ]
-  if asics[ set selected-brands lput "Asics" selected-brands ]
-
-  setup-shoes
-  let total-shoes count shoes
-  setup-runners total-shoes
+  clear-all
+  setup-environment
+  setup-runners
+  setup-spectators
+  setup-pacers
   reset-ticks
 end
 
-to setup-running-track
-  set track-radius 17.5
-  set track-width 5
 
-  ask patches [
-    let distancee distancexy 0 0
-    ifelse distancee <= track-radius and distancee >= track-radius - track-width [
-      set pcolor 5 ; dark gray for road patches
-    ][
-      set pcolor green ; grass inside and outside the circle
-    ]
-  ]
+to setup-environment
+  ; Set all patches to represent the road
+  ask patches [ set pcolor gray ]
 
-  set road-patches patches with [pcolor = 5]
-  set grass-patches patches with [pcolor = green]
+  ; Define the central lawn area
+  ask patches with [ abs(pycor) < 14 and abs(pxcor) < 14 ] [ set pcolor green ]
 end
 
-to setup-plants-and-trees
-  let num-plants 50
-  let num-trees 20
-
-  ; Create plants
-  let available-plant-patches grass-patches with [not any? neighbors with [pcolor = 5 or pcolor = 6]]
-  ask n-of min list num-plants count available-plant-patches available-plant-patches [
-    sprout-plants 1 [
-      set shape "plant"
-      set color one-of [green brown]
-      set size 1
-    ]
-  ]
-
-  ; Create trees
-  let available-tree-patches grass-patches with [not any? neighbors with [pcolor = 5 or pcolor = 6] and not any? plants-here]
-  ask n-of min list num-trees count available-tree-patches available-tree-patches [
-    sprout-trees 1 [
-      set shape "tree"
-      set color one-of [green brown]
-      set size 2
-    ]
+to setup-runners
+  create-runners number-of-runners [
+    set shape "person"
+    set color red
+    set size 1
+    set speed random-float 1.0
+    set endurance random-float 1.0
+    set motivation random-float 1.0
+    set social-influence-susceptibility random-float 1.0
+    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
+    set heading 90
   ]
 end
 
-to setup-shoes
-  foreach selected-brands [shoe-brand ->
-    let shoeTypes ["Running" "Non-Running"]
-    foreach shoeTypes [shoeType ->
-      create-shoe shoe-brand shoeType
-    ]
+to setup-spectators
+  create-spectators number-of-spectators [
+    set shape "person"
+    set color blue
+    set size 1
+    set cheering-intensity random-float 1.0
+    move-to one-of patches with [ pcolor = green and abs(pxcor) < 14 and abs(pycor) < 14 ]
+
+
   ]
 end
 
-to create-shoe [shoe-brand shoeType]
-  create-shoes 1 [
-    set brand shoe-brand
-    set durability random-normal 500 50
-    set current-distance 0
-    set cushioning 100
-    set support 100
-    set outsole-wear 0
-    set shoe-type shoeType
-    set shape "footprint human"
-    set color choose-color shoe-brand
-    setxy random-xcor random-ycor
-    set size 2
-    set runner-id -1 ; Unassigned shoe
-  ]
-end
-
-to-report choose-color [shoe-brand]
-  ; Adjust the color selection logic if needed
-  report ifelse-value (shoe-brand = "Nike") [red] [
-    ifelse-value (brand = "Adidas") [blue] [
-      ifelse-value (brand = "New Balance") [black][pink]
-    ]
-  ]
-end
-
-to setup-runners [total-runners]
-  repeat total-runners[
-   create-runner-and-assign-shoes
-  ]
-end
-
-to create-runner-and-assign-shoes
-  create-runners 1 [
-  set weight random-normal 75 10
-  set running-style one-of ["pronation" "supination" "neutral"]
-  set weekly-distance random-normal 20 5
-  set surface-preference "road"
-  set shoe-worn-out false
-  set shape "person"
-  set size 2
-  set color white
-  set trainers one-of shoes with [not any? runners-here]
-  setxy 0 (track-radius - track-width / 2)
-  set shoe-id -1
-  set total-mileage 0
-  set speed-category one-of ["slow" "medium" "fast"]
-  ifelse speed-category = "slow" [
-    set speed 0.001
-  ][
-    ifelse speed-category = "medium" [
-      set speed 0.002
-    ][
-      set speed 0.003
-    ]
-  ]
-      assign-shoe
-  ]
-
-end
-
-
-to assign-shoe
-  let available-shoes shoes with [runner-id = -1]
-  if any? available-shoes [
-    let assigned-shoe one-of available-shoes
-    set shoe-id [who] of assigned-shoe
-    ask assigned-shoe [
-      set runner-id [who] of myself
-    ]
+to setup-pacers
+  create-pacers number-of-pacers [
+    set shape "person"
+    set color yellow
+    set size 1.5
+    set set-pace random-float 1.0
+    set visibility random-float 1.0
+    set group-size 0
+    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
+    set heading 90
   ]
 end
 
 to go
   ask runners [
-    let assigned-shoe one-of shoes with [who = [shoe-id] of myself]
-    if assigned-shoe != nobody [
-      let mileage weekly-distance
-      let angle heading
-      set angle angle + speed
-      let new-position calculate-new-position angle
-      let other-runners-ahead other runners in-cone 2 90
-
-      ifelse any? other-runners-ahead [
-        set new-position avoid-collision angle other-runners-ahead
-      ][
-        set new-position stay-on-track new-position
-      ]
-
-      setxy item 0 new-position item 1 new-position
-      set heading angle
-
-      ask assigned-shoe [
-        update-shoe-properties mileage myself
-      ]
-    ]
+    move-runners
+    interact-with-nearby-runners
+    interact-with-nearby-spectators
+    interact-with-nearby-pacers
+    check-if-finished
   ]
-
+  ask pacers [
+    move-pacers
+    maintain-pace
+    gather-runners
+  ]
   tick
 end
 
-to-report calculate-new-position [angle]
-  let new-xcor (track-radius - track-width / 2) * cos(angle)
-  let new-ycor (track-radius - track-width / 2) * sin(angle)
-  report list new-xcor new-ycor
+to move-runners
+  ; Move the runner forward in the direction it's facing
+  fd speed
+  ; Check if the runner needs to turn based on its current position and heading
+  if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
+    set heading (heading + 90) mod 360
+  ]
+  if (pycor = 15 and heading = 0) or (pycor = -15 and heading = 180) [
+    set heading (heading + 90) mod 360
+  ]
 end
 
-to-report avoid-collision [angle other-runners-ahead]
-  let min-angle angle - 20
-  let max-angle angle + 20
-  set angle random-float (max-angle - min-angle) + min-angle
-  let new-position calculate-new-position angle
+to move-pacers
+  ; Move the pacer forward in the direction it's facing
+  fd set-pace
+  ; Check if the pacer needs to turn based on its current position and heading
+  if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
+    set heading (heading + 90) mod 360
+  ]
+  if (pycor = 15 and heading = 0) or (pycor = -15 and heading = 180) [
+    set heading (heading + 90) mod 360
+  ]
+end
 
-  let target-patch patch item 0 new-position item 1 new-position
-  while [target-patch = nobody or [pcolor] of target-patch != 5] [
-    ifelse random 2 = 0 [
-      set angle angle + 5
-    ][
-      set angle angle - 5
+
+to interact-with-nearby-runners
+  ; Check for nearby runners and adjust motivation and speed based on social influence
+  ; You can customize this based on your specific social influence rules
+  ; Example:
+  let nearby-runners runners in-radius social-influence-radius
+  if any? nearby-runners [
+    let average-speed mean [speed] of nearby-runners
+    set speed speed * (1 - social-influence-susceptibility) + average-speed * social-influence-susceptibility
+  ]
+end
+
+to interact-with-nearby-spectators
+  ; Check for nearby spectators and adjust motivation based on their cheering
+  ; You can customize this based on your specific spectator influence rules
+  ; Example:
+  let nearby-spectators spectators in-radius 1
+  if any? nearby-spectators [
+    let average-cheering-intensity mean [cheering-intensity] of nearby-spectators
+    set motivation motivation * (1 - social-influence-susceptibility) + average-cheering-intensity * social-influence-susceptibility
+  ]
+end
+
+to check-if-finished
+  ; Check if the runner has reached the finish line
+  if pycor = max-pycor [
+    set color green
+    ;die
+    stop
+  ]
+end
+
+to interact-with-nearby-pacers
+  ; Check for nearby pacers and decide whether to follow them
+  ; You can customize this based on your specific pacer influence rules
+  ; Example:
+  let nearby-pacers pacers in-radius social-influence-radius
+  if any? nearby-pacers and not following-pacer? [
+    let most-visible-pacer max-one-of nearby-pacers [visibility]
+    if random-float 1.0 < [visibility] of most-visible-pacer [
+      set following-pacer? true
+      set speed [set-pace] of most-visible-pacer
+      ask most-visible-pacer [set group-size group-size + 1]
     ]
-    set new-position calculate-new-position angle
-    set target-patch patch item 0 new-position item 1 new-position
   ]
-
-  report new-position
 end
 
-to-report stay-on-track [new-position]
-  let target-patch patch item 0 new-position item 1 new-position
-  if target-patch != nobody and [pcolor] of target-patch != 5 [
-    let angle towards target-patch
-    let min-angle angle - 5
-    let max-angle angle + 5
-    set angle random-float (max-angle - min-angle) + min-angle
-    set new-position calculate-new-position angle
+to maintain-pace
+  ; Pacers maintain their set pace and slightly adjust to support runner needs
+  ; You can customize this based on your specific pacer behavior rules
+  ; Example:
+  fd set-pace
+  if group-size > 0 [
+    let average-runner-speed mean [speed] of runners with [following-pacer? and distance myself < social-influence-radius]
+    set set-pace set-pace * 0.9 + average-runner-speed * 0.1
   ]
-  report new-position
 end
 
-to update-shoe-properties [mileage a-runner]
-  setxy [xcor] of  a-runner [ycor] of  a-runner
-  set heading [heading] of  a-runner
-  set current-distance current-distance + mileage
-  set cushioning cushioning - mileage / 100
-  set support support - mileage / 100
-  set outsole-wear outsole-wear + mileage / 50
+to gather-runners
+  ; Pacers encourage nearby runners to join their group
+  ; You can customize this based on your specific pacer-runner interaction rules
+  ; Example:
+  let nearby-runners runners in-radius social-influence-radius with [not following-pacer?]
+  if any? nearby-runners [
+    ask nearby-runners [
+      if random-float 1.0 < [visibility] of myself [
+        set following-pacer? true
+        set speed [set-pace] of myself
+        ask myself [set group-size group-size + 1]
+      ]
+    ]
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-367
-10
-954
-598
+318
+25
+755
+463
 -1
 -1
-17.55
+13.0
 1
 10
 1
@@ -290,11 +226,11 @@ ticks
 30.0
 
 BUTTON
-32
-58
-176
-108
-Setup
+25
+78
+91
+111
+NIL
 setup
 NIL
 1
@@ -307,10 +243,10 @@ NIL
 1
 
 BUTTON
-218
-56
-361
-97
+110
+77
+173
+110
 Go
 go
 T
@@ -323,59 +259,50 @@ NIL
 NIL
 1
 
-SWITCH
-15
-368
-141
-401
-nike
-nike
+SLIDER
+14
+246
+192
+279
+number-of-runners
+number-of-runners
+2
+100
+2.0
 1
 1
--1000
+NIL
+HORIZONTAL
 
-SWITCH
-16
-233
-157
-266
-adidas
-adidas
-0
+SLIDER
+8
+346
+194
+379
+number-of-spectators
+number-of-spectators
+5
+20
+16.0
 1
--1000
+1
+NIL
+HORIZONTAL
 
-SWITCH
-15
-319
-150
-352
-new-balance
-new-balance
+SLIDER
+60
+431
+232
+464
+number-of-pacers
+number-of-pacers
+2
+100
+2.0
 1
 1
--1000
-
-SWITCH
-16
-273
-119
-306
-asics
-asics
-1
-1
--1000
-
-TEXTBOX
-27
-205
-177
-223
-Select Shoe Brands
-11
-0.0
-1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -555,14 +482,6 @@ Circle -7500403 true true 96 51 108
 Circle -16777216 true false 113 68 74
 Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
-
-footprint human
-true
-0
-Polygon -7500403 true true 111 244 115 272 130 286 151 288 168 277 176 257 177 234 175 195 174 172 170 135 177 104 188 79 188 55 179 45 181 32 185 17 176 1 159 2 154 17 161 32 158 44 146 47 144 35 145 21 135 7 124 9 120 23 129 36 133 49 121 47 100 56 89 73 73 94 74 121 86 140 99 163 110 191
-Polygon -7500403 true true 97 37 101 44 111 43 118 35 111 23 100 20 95 25
-Polygon -7500403 true true 77 52 81 59 91 58 96 50 88 39 82 37 76 42
-Polygon -7500403 true true 63 72 67 79 77 78 79 70 73 63 68 60 63 65
 
 house
 false
