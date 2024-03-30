@@ -11,6 +11,8 @@ runners-own [
   finish-time
   speed-consistency
   dropped-out?
+  social-influence-susceptibility-quantile
+  group-id
 ]
 
 spectators-own [
@@ -54,16 +56,33 @@ to setup-runners
   create-runners number-of-runners [
     ;print(word "Number of runners:" number-of-runners)
     set shape "person"
-    set color brown
-    set size 1
+    ;set color brown
+    set size 1.5
     set speed random-float 1.0
     set endurance random-float 1.0
     set motivation random-float 1.0
-    set social-influence-susceptibility random-float 1.0
+    set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
+      ; Assign colors based on social-influence-susceptibility
+    let q1 0.25  ; 25th percentile
+    let q2 0.75  ; 75th percentile
+
+    ifelse social-influence-susceptibility <= q1 [
+      set color violet  ; Runners within the 25th percentile are violet
+      set social-influence-susceptibility-quantile "first"
+    ] [
+      ifelse social-influence-susceptibility <= q2 [
+        set color brown  ; Runners between the 25th and 75th percentile are brown
+        set social-influence-susceptibility-quantile "average"
+      ] [
+        set color orange  ; Runners above the 75th percentile are orange
+        set social-influence-susceptibility-quantile "third"
+      ]
+    ]
     set finish-time 0
     set speed-consistency 0
     set dropped-out? false
     ;setxy x-pos (min-pycor + 1)
+    set group-id -1
     move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
     set heading 90
     ;set x-pos (x-pos + x-spacing)
@@ -87,7 +106,7 @@ to setup-pacers
   create-pacers number-of-pacers [
     set shape "person"
     set color yellow
-    set size 1.5
+    set size 1
     set set-pace random-float 1.0
     set visibility random-float 1.0
     set group-size 0
@@ -100,7 +119,7 @@ to go
   ask runners [
     move-runners
     ;interact-with-nearby-runners
-    check-if-dropped-out
+    ;check-if-dropped-out
     ;interact-with-nearby-spectators
     ;interact-with-nearby-pacers
     ;check-if-finished
@@ -115,11 +134,12 @@ end
 
 to move-runners
   ; Move the runner forward in the direction it's facing
+
   fd speed
   ; Check if the runner needs to turn based on its current position and heading
 
   ; Update speed consistency
-  set speed-consistency speed-consistency  + (speed - speed-consistency) / (ticks + 1)
+  ;set speed-consistency speed-consistency  + (speed - speed-consistency) / (ticks + 1)
   if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
     set heading (heading + 90) mod 360
   ]
@@ -160,32 +180,137 @@ to move-pacers
   ]
 end
 
-
+;to update-endurance
+;  ; endurance should will naturally decrease, but if your motivation increases then your endurance should be adjusted
+;  ifelse (social-influence-susceptibility-quantile = "third")[
+;    set endurance endurance
+;  ][
+;    ifelse
+;  ]
+;
+;end
 to interact-with-nearby-runners
-   ; Check for nearby runners based on distance
-  let nearby-runners other runners in-radius 2
 
-  ; If there are nearby runners
-  if any? nearby-runners [
-    ; Find the runner with the closest speed
-    let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
-    let closest-speed [speed] of closest-runner
 
-    ; If the runner's speed is close to the closest runner's speed but not greater
-    if speed <= closest-speed + 0.2 and speed >= closest-speed - 0.2 [
-      ; Form a group and change color to pink
-      set color pink
-      ask closest-runner [set color pink]
+ ; Check if the runner's social-influence-susceptibility is high enough to form a group
+  ;print(word "Social influence" social-influence-susceptibility)
+  ifelse social-influence-susceptibility > 0.5 [
+      ; Check for nearby runners based on distance
+      let nearby-runners other runners in-radius 2
+      ifelse any? nearby-runners [
+      ; Find the runner with the closest speed
+      let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
+      let closest-speed [speed] of closest-runner
+      let speed-diff abs (speed - closest-speed)
+
+      ; If the speed difference is within the tolerance range
+      if speed-diff <= 0.1 [
+            ;print("Forming group")
+        ; Form a group and change color to pink
+        set color pink
+        set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
+        ask closest-runner [set color pink]
+      ]
+
+    ][
+    ; If the runner is pink and there are no other pink runners within a certain radius
+    if color = pink and not any? other runners in-radius 4 with [color = pink] [
+        print("This is true")
+        ; instead of immediately reverting color, mark this runner for reversion
+        set group-id -2  ; Using -2 as an example mark for reversion
+        ;revert-color-based-on-quantile
+      ]
+
     ]
+
+    ; Now, revert color for all marked runners collectively
+    ask runners with [group-id = -2] [
+    ; Revert color based on social-influence-susceptibility-quantile
+    revert-color-based-on-quantile
+    ; Reset group-id back to -1 indicating they are no longer in a group
+    set group-id -1
   ]
 
-  ; If the runner has surpassed the group
-  let pink-runners runners with [color = pink]
-  if color = pink and any? pink-runners and speed > min [speed] of pink-runners [
-    ; Change color to brown
-    set color brown
+  ][
+
+    ; If the runner is pink and there are no other pink runners within a certain radius
+    if color = pink and not any? other runners in-radius 4 with [color = pink] [
+        print("This is true")
+        ; instead of immediately reverting color, mark this runner for reversion
+        set group-id -2  ; Using -2 as an example mark for reversion
+        ;revert-color-based-on-quantile
+      ]
+
   ]
 
+
+end
+
+
+to revert-color-based-on-quantile
+  ; Change color back to the original color based on social-influence-susceptibility quantile
+    let q1 0.25  ; 25th percentile
+    let q2 0.75  ; 75th percentile
+    ifelse social-influence-susceptibility <= q1 [
+      set color violet  ; Runners within the 25th percentile are violet
+    ] [
+      ifelse social-influence-susceptibility <= q2 [
+        set color brown  ; Runners between the 25th and 75th percentile are brown
+      ] [
+        set color orange  ; Runners above the 75th percentile are orange
+      ]
+    ]
+
+end
+
+to test
+;  ifelse group-id = -1 [
+;    ;print("Not in a group")
+;    ; If there are nearby runners
+;    if any? nearby-runners [
+;      ; Find the runner with the closest speed
+;      let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
+;      let closest-speed [speed] of closest-runner
+;      let speed-diff abs (speed - closest-speed)
+;
+;      ; Check if the runner's social-influence-susceptibility is high enough to form a group
+;      if social-influence-susceptibility > 0.5 [
+;
+;        ; If the speed difference is within the tolerance range
+;        if speed-diff <= 0.1 [
+;              ;print("Forming group")
+;          ; Form a group and change color to pink
+;          set color pink
+;          set group-id [group-id] of closest-runner
+;          ask closest-runner [set color pink]
+;        ]
+;      ]
+;    ]
+;  ]
+;  ; If the runner is in a group
+;  [
+;    print("Already in a group")
+;  ; Check if there are any nearby runners in the same group
+;    let same-group-runners runners in-radius 2 with [group-id = [group-id] of myself]
+;
+;    ; If there are no nearby runners in the same group
+;    if not any? same-group-runners [
+;      print("Breaking group")
+;      ; Leave the group and revert to the original color
+;      set group-id -1
+;      let q1 0.25  ; 25th percentile
+;      let q2 0.75  ; 75th percentile
+;      ifelse social-influence-susceptibility <= q1 [
+;        set color violet  ; Runners within the 25th percentile are violet
+;      ] [
+;        ifelse social-influence-susceptibility <= q2 [
+;          set color brown  ; Runners between the 25th and 75th percentile are brown
+;        ] [
+;          set color orange  ; Runners above the 75th percentile are orange
+;        ]
+;      ]
+;    ]
+;  ]
 end
 
 to interact-with-nearby-spectators
@@ -251,13 +376,13 @@ to gather-runners
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-318
-25
-755
-463
+332
+18
+975
+662
 -1
 -1
-13.0
+19.242424242424246
 1
 10
 1
@@ -320,7 +445,7 @@ number-of-runners
 number-of-runners
 2
 100
-4.0
+12.0
 1
 1
 NIL
@@ -335,7 +460,7 @@ number-of-spectators
 number-of-spectators
 5
 20
-16.0
+20.0
 1
 1
 NIL
