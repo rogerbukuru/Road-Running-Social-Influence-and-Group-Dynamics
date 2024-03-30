@@ -8,6 +8,9 @@ runners-own [
   motivation
   social-influence-susceptibility
   following-pacer?
+  finish-time
+  speed-consistency
+  dropped-out?
 ]
 
 spectators-own [
@@ -32,7 +35,7 @@ to setup
   setup-environment
   setup-runners
   setup-spectators
-  setup-pacers
+  ;setup-pacers
   reset-ticks
 end
 
@@ -47,13 +50,17 @@ end
 
 to setup-runners
   create-runners number-of-runners [
+    print(word "Number of runners:" number-of-runners)
     set shape "person"
-    set color red
+    set color brown
     set size 1
     set speed random-float 1.0
     set endurance random-float 1.0
     set motivation random-float 1.0
     set social-influence-susceptibility random-float 1.0
+    set finish-time 0
+    set speed-consistency 0
+    set dropped-out? false
     move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
     set heading 90
   ]
@@ -87,16 +94,17 @@ end
 to go
   ask runners [
     move-runners
-    interact-with-nearby-runners
-    interact-with-nearby-spectators
-    interact-with-nearby-pacers
+    ;interact-with-nearby-runners
+    check-if-dropped-out
+    ;interact-with-nearby-spectators
+    ;interact-with-nearby-pacers
     check-if-finished
   ]
-  ask pacers [
-    move-pacers
-    maintain-pace
-    gather-runners
-  ]
+;  ask pacers [
+;    move-pacers
+;    maintain-pace
+;    gather-runners
+;  ]
   tick
 end
 
@@ -104,11 +112,34 @@ to move-runners
   ; Move the runner forward in the direction it's facing
   fd speed
   ; Check if the runner needs to turn based on its current position and heading
+
+  ; Update speed consistency
+  set speed-consistency speed-consistency  + (speed - speed-consistency) / (ticks + 1)
   if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
     set heading (heading + 90) mod 360
   ]
   if (pycor = 15 and heading = 0) or (pycor = -15 and heading = 180) [
     set heading (heading + 90) mod 360
+  ]
+  ; Move runners with similar speeds next to each other
+  let speed-tolerance 0.1
+  let similar-speed-runners other runners-here with [abs (speed - [speed] of myself) <= speed-tolerance]
+  if any? similar-speed-runners [
+    let x-offset 1
+    ask similar-speed-runners [
+      setxy (xcor - x-offset) ycor
+      set x-offset x-offset + 1
+    ]
+    setxy (xcor + x-offset - 1) ycor
+  ]
+  ;interact-with-nearby-runners
+end
+
+to check-if-dropped-out
+  if motivation < 0.2 or endurance < 0.2 [
+    set dropped-out? true
+    set color gray
+    stop
   ]
 end
 
@@ -126,14 +157,30 @@ end
 
 
 to interact-with-nearby-runners
-  ; Check for nearby runners and adjust motivation and speed based on social influence
-  ; You can customize this based on your specific social influence rules
-  ; Example:
-  let nearby-runners runners in-radius social-influence-radius
+   ; Check for nearby runners based on distance
+  let nearby-runners other runners in-radius 2
+
+  ; If there are nearby runners
   if any? nearby-runners [
-    let average-speed mean [speed] of nearby-runners
-    set speed speed * (1 - social-influence-susceptibility) + average-speed * social-influence-susceptibility
+    ; Find the runner with the closest speed
+    let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
+    let closest-speed [speed] of closest-runner
+
+    ; If the runner's speed is close to the closest runner's speed but not greater
+    if speed <= closest-speed + 0.2 and speed >= closest-speed - 0.2 [
+      ; Form a group and change color to pink
+      set color pink
+      ask closest-runner [set color pink]
+    ]
   ]
+
+  ; If the runner has surpassed the group
+  let pink-runners runners with [color = pink]
+  if color = pink and any? pink-runners and speed > min [speed] of pink-runners [
+    ; Change color to brown
+    set color brown
+  ]
+
 end
 
 to interact-with-nearby-spectators
@@ -268,7 +315,7 @@ number-of-runners
 number-of-runners
 2
 100
-2.0
+4.0
 1
 1
 NIL
@@ -290,10 +337,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-60
-431
-232
-464
+6
+403
+178
+436
 number-of-pacers
 number-of-pacers
 2
@@ -303,6 +350,23 @@ number-of-pacers
 1
 NIL
 HORIZONTAL
+
+BUTTON
+16
+173
+263
+206
+Evaluate Runner Group Formations
+fgg
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
