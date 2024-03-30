@@ -9,10 +9,12 @@ runners-own [
   social-influence-susceptibility
   following-pacer?
   finish-time
-  speed-consistency
   dropped-out?
   social-influence-susceptibility-quantile
   group-id
+  laps-completed
+  just-crossed-line?
+  finished-race?
 ]
 
 spectators-own [
@@ -26,7 +28,7 @@ pacers-own [
 ]
 
 globals [
-  race-distance
+  laps-required
   social-influence-radius
   track-size
   lawn-size
@@ -35,6 +37,7 @@ globals [
 to setup
   clear-all
   setup-environment
+  setup-race-total-laps
   setup-runners
   setup-spectators
   ;setup-pacers
@@ -47,20 +50,41 @@ to setup-environment
   ask patches [ set pcolor gray ]
 
   ; Define the central lawn area
-  ask patches with [ abs(pycor) < 14 and abs(pxcor) < 14 ] [ set pcolor green ]
+  ask patches with [ abs(pycor) < 12 and abs(pxcor) < 12 ] [ set pcolor green ]
+    ; Assuming the start/finish line is 5 patches long for demonstration.
+  ; This line starts from the bottom left corner of the lawn and extends right.
+  let start-finish-line-length 6
+  ask patches with [pycor = -11 and pxcor >= -16 and pxcor < (-16 + start-finish-line-length)] [
+    set pcolor ifelse-value (pxcor mod 2 = 0) [black] [white]
+  ]
+end
+
+
+
+to setup-race-total-laps
+  set laps-required race-distance / 1
 end
 
 to setup-runners
   ;let x-spacing (2 * (max-pxcor - 1)) / (number-of-runners + 1)
   ;let x-pos (min-pxcor + 1 + x-spacing)
+
+  let start-line-y -11 ; Adjust based on your track setup
+  let start-line-x-start -16
+  let start-line-length 0.5  ; Length of your start line
+
+  ; Calculate spacing if needed, to distribute runners along the start line.
+  let spacing number-of-runners / start-line-length   ; This could be adjusted based on the number of runners and the length of the start line.
+
+
   create-runners number-of-runners [
     ;print(word "Number of runners:" number-of-runners)
     set shape "person"
     ;set color brown
     set size 1.5
     set speed random-float 1.0
-    set endurance random-float 1.0
-    set motivation random-float 1.0
+    set endurance 10
+    set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
       ; Assign colors based on social-influence-susceptibility
     let q1 0.25  ; 25th percentile
@@ -83,8 +107,16 @@ to setup-runners
     set dropped-out? false
     ;setxy x-pos (min-pycor + 1)
     set group-id -1
-    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
-    set heading 90
+    ;move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -12 ]
+    set laps-completed 0
+    set just-crossed-line? true  ; Prevent initial lap increase.
+
+    ; Position runners on the start line.
+    let assigned-x start-line-x-start + (who mod start-line-length) * spacing
+    let assigned-y start-line-y
+    setxy assigned-x assigned-y
+    set finished-race? false
+    set heading 0
     ;set x-pos (x-pos + x-spacing)
 
   ]
@@ -116,9 +148,15 @@ to setup-pacers
 end
 
 to go
+  if all? runners [finished-race?] [
+    print "All runners have finished the race."
+    analyze-group-running-results
+    stop
+  ]
   ask runners [
     move-runners
-    ;interact-with-nearby-runners
+    update-runner-attributes
+    form-running-groups
     ;check-if-dropped-out
     ;interact-with-nearby-spectators
     ;interact-with-nearby-pacers
@@ -133,40 +171,55 @@ to go
 end
 
 to move-runners
-  ; Move the runner forward in the direction it's facing
+  ; Detect potential collision directly ahead and calculate available space for lateral movement.
+  ask runners [
+  if not finished-race?[
+  let ahead-patch patch-ahead 1
+  let collision-ahead? any? other runners with [patch-here = ahead-patch]
 
-  fd speed
-  ; Check if the runner needs to turn based on its current position and heading
+  if collision-ahead? [
+    ; Determine the direction with more space for lateral movement.
+    let left-space count (patches at-points [[-1 0]] with [pcolor != green and not any? other runners-here])
+    let right-space count (patches at-points [[1 0]] with [pcolor != green and not any? other runners-here])
 
-  ; Update speed consistency
-  ;set speed-consistency speed-consistency  + (speed - speed-consistency) / (ticks + 1)
-  if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
-    set heading (heading + 90) mod 360
-  ]
-  if (pycor = 15 and heading = 0) or (pycor = -15 and heading = 180) [
-    set heading (heading + 90) mod 360
-  ]
-  ; Move runners with similar speeds next to each other
-  let speed-tolerance 0.1
-  let similar-speed-runners other runners-here with [abs (speed - [speed] of myself) <= speed-tolerance]
-  if any? similar-speed-runners [
-    let x-offset 1
-    ask similar-speed-runners [
-      setxy (xcor - x-offset) ycor
-      set x-offset x-offset + 1
+    ; Choose the direction with more available space to move.
+    if left-space > right-space and left-space > 0 [
+      move-laterally -1
     ]
-    setxy (xcor + x-offset - 1) ycor
+    if right-space > 0 [
+      move-laterally 1
+    ]
   ]
-  interact-with-nearby-runners
+
+  ; Move forward after lateral movement decision.
+  fd speed
+  update-laps-completed
+  ; Adjust heading at track boundaries to stay within the track.
+  adjust-heading-at-boundaries
+  ]
+  ]
 end
 
-to check-if-dropped-out
-  if motivation < 0.2 or endurance < 0.2 [
-    set dropped-out? true
-    set color black
-    ;stop
+; Helper procedure to move runners laterally without direct xcor/ycor manipulation.
+to move-laterally [dir]
+  ; dir is -1 for left, 1 for right
+  right dir * 90
+  fd 1
+  left dir * 90
+end
+
+; Helper procedure to adjust heading at track boundaries.
+to adjust-heading-at-boundaries
+  if (pxcor >= 15 and heading = 90) or (pxcor <= -15 and heading = 270) [
+    set heading (heading + 90) mod 360
+  ]
+  if (pycor >= 15 and heading = 0) or (pycor <= -15 and heading = 180) [
+    set heading (heading + 90) mod 360
   ]
 end
+
+
+
 
 to move-pacers
   ; Move the pacer forward in the direction it's facing
@@ -180,20 +233,12 @@ to move-pacers
   ]
 end
 
-;to update-endurance
-;  ; endurance should will naturally decrease, but if your motivation increases then your endurance should be adjusted
-;  ifelse (social-influence-susceptibility-quantile = "third")[
-;    set endurance endurance
-;  ][
-;    ifelse
-;  ]
-;
-;end
-to interact-with-nearby-runners
+to form-running-groups
 
 
  ; Check if the runner's social-influence-susceptibility is high enough to form a group
   ;print(word "Social influence" social-influence-susceptibility)
+  if not finished-race?[
   ifelse social-influence-susceptibility > 0.5 [
       ; Check for nearby runners based on distance
       let nearby-runners other runners in-radius 2
@@ -208,14 +253,17 @@ to interact-with-nearby-runners
             ;print("Forming group")
         ; Form a group and change color to pink
         set color pink
-        set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
-        ask closest-runner [set color pink]
+        set group-id 1
+        ;set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
+        ask closest-runner [
+          set color pink
+          set group-id 1
+        ]
       ]
 
     ][
     ; If the runner is pink and there are no other pink runners within a certain radius
     if color = pink and not any? other runners in-radius 4 with [color = pink] [
-        print("This is true")
         ; instead of immediately reverting color, mark this runner for reversion
         set group-id -2  ; Using -2 as an example mark for reversion
         ;revert-color-based-on-quantile
@@ -235,14 +283,13 @@ to interact-with-nearby-runners
 
     ; If the runner is pink and there are no other pink runners within a certain radius
     if color = pink and not any? other runners in-radius 4 with [color = pink] [
-        print("This is true")
         ; instead of immediately reverting color, mark this runner for reversion
         set group-id -2  ; Using -2 as an example mark for reversion
         ;revert-color-based-on-quantile
       ]
 
   ]
-
+  ]
 
 end
 
@@ -263,55 +310,115 @@ to revert-color-based-on-quantile
 
 end
 
-to test
-;  ifelse group-id = -1 [
-;    ;print("Not in a group")
-;    ; If there are nearby runners
-;    if any? nearby-runners [
-;      ; Find the runner with the closest speed
-;      let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
-;      let closest-speed [speed] of closest-runner
-;      let speed-diff abs (speed - closest-speed)
-;
-;      ; Check if the runner's social-influence-susceptibility is high enough to form a group
-;      if social-influence-susceptibility > 0.5 [
-;
-;        ; If the speed difference is within the tolerance range
-;        if speed-diff <= 0.1 [
-;              ;print("Forming group")
-;          ; Form a group and change color to pink
-;          set color pink
-;          set group-id [group-id] of closest-runner
-;          ask closest-runner [set color pink]
-;        ]
-;      ]
-;    ]
-;  ]
-;  ; If the runner is in a group
-;  [
-;    print("Already in a group")
-;  ; Check if there are any nearby runners in the same group
-;    let same-group-runners runners in-radius 2 with [group-id = [group-id] of myself]
-;
-;    ; If there are no nearby runners in the same group
-;    if not any? same-group-runners [
-;      print("Breaking group")
-;      ; Leave the group and revert to the original color
-;      set group-id -1
-;      let q1 0.25  ; 25th percentile
-;      let q2 0.75  ; 75th percentile
-;      ifelse social-influence-susceptibility <= q1 [
-;        set color violet  ; Runners within the 25th percentile are violet
-;      ] [
-;        ifelse social-influence-susceptibility <= q2 [
-;          set color brown  ; Runners between the 25th and 75th percentile are brown
-;        ] [
-;          set color orange  ; Runners above the 75th percentile are orange
-;        ]
-;      ]
-;    ]
-;  ]
+
+to update-runner-attributes
+  ask runners [
+    ; Adjust motivation if in a group or not.
+    ifelse group-id != -1 [
+      let group-mates runners with [group-id = [group-id] of myself]
+      let group-average-motivation mean [motivation] of group-mates
+      set motivation (motivation + group-average-motivation) / 2
+    ] [
+      ; Decrease motivation faster for highly susceptible runners not in a group.
+      if social-influence-susceptibility > 0.5 [
+        set motivation motivation - 0.01  ; Adjust as needed.
+      ]
+    ]
+    if motivation < 0 [ set motivation 0 ]
+    ; Decrease endurance at a rate influenced by current motivation.
+    ; Endurance decreases slower if motivation is high, simulating sustained effort.
+    let endurance_decrease_rate 0.001 - (0.0005 * motivation)
+    set endurance endurance - endurance_decrease_rate
+
+    ; Ensure endurance doesn't drop below 0.
+    if endurance < 0 [
+      set endurance 0
+      die
+    ]
+
+    ; Update speed based on current motivation and endurance.
+    update-speed
+  ]
 end
+
+
+to update-speed
+  ; Adjust speed based on the current motivation and endurance levels, with checks to prevent it from going too low.
+  ifelse motivation > 0.5 and endurance > 0.5 [
+    set speed min(list (speed * 1.05) 1.0)  ; Can increase speed up to a limit.
+  ] [
+    set speed max(list (speed * 0.95) 0.1)  ; Ensure speed doesn't drop below a minimum.
+  ]
+end
+
+
+to update-laps-completed
+  ask runners [
+    let at_start_finish_line (pycor = -11 and pxcor >= -16 and pxcor < (-16 + 6))
+    if at_start_finish_line and not just-crossed-line? [
+      if laps-completed < laps-required [
+        set laps-completed laps-completed + 1
+        ;print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
+      ]
+      set just-crossed-line? true
+    ]
+    if not at_start_finish_line [
+      set just-crossed-line? false
+    ]
+    if laps-completed >= laps-required and not finished-race? [
+      move-to one-of patches with [pcolor = green]  ; Direct finished runners to the lawn.
+      set finished-race? true
+      set finish-time ticks
+      print(word "Runner group id: " group-id)
+      ;print (word "Runner " who " has completed the race at tick: " ticks)
+    ]
+  ]
+end
+
+
+to analyze-group-running-results
+  if all? runners [finished-race?] [
+    let group-runners runners with [group-id = 1 and finish-time > 0]
+    let solo-runners runners with [group-id = -1 and finish-time > 0]
+    print(word "Total group runners " count group-runners)
+    print(word "Total solo runners " count solo-runners)
+
+    ; Use count to check if the agentset is empty
+    let avg-group-time ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0]
+    let avg-solo-time ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0]
+
+    let avg-group-speed ifelse-value (count group-runners > 0) [mean [speed] of group-runners] [0]
+    let avg-solo-speed ifelse-value (count solo-runners > 0) [mean [speed] of solo-runners] [0]
+
+    print (word "Average group finish time: " avg-group-time)
+    print (word "Average solo finish time: " avg-solo-time)
+    print (word "Average group speed: " avg-group-speed)
+    print (word "Average solo speed: " avg-solo-speed)
+  ]
+end
+
+
+
+
+;to-report avg-group-runner-speed
+;  let group-runners runners with [any? other runners in-radius social-influence-radius]
+;  ifelse count group-runners > 0 [
+;    report mean [speed] of group-runners
+;  ][
+;    report 0
+;  ]
+;end
+;
+;to-report avg-solo-runners-speed
+;  let solo-runners runners with [not any? other runners in-radius social-influence-radius]
+;  ifelse count solo-runners > 0 [
+;    report mean [speed] of solo-runners
+;  ][
+;    report 0
+;  ]
+;end
+
+
 
 to interact-with-nearby-spectators
   ; Check for nearby spectators and adjust motivation based on their cheering
@@ -389,8 +496,8 @@ GRAPHICS-WINDOW
 1
 1
 0
-1
-1
+0
+0
 1
 -16
 16
@@ -444,8 +551,8 @@ SLIDER
 number-of-runners
 number-of-runners
 2
-100
-12.0
+20
+8.0
 1
 1
 NIL
@@ -497,6 +604,16 @@ NIL
 NIL
 NIL
 1
+
+CHOOSER
+14
+286
+152
+331
+race-distance
+race-distance
+5 10 21 42.5
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
