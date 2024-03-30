@@ -49,8 +49,10 @@ to setup-environment
 end
 
 to setup-runners
+  ;let x-spacing (2 * (max-pxcor - 1)) / (number-of-runners + 1)
+  ;let x-pos (min-pxcor + 1 + x-spacing)
   create-runners number-of-runners [
-    print(word "Number of runners:" number-of-runners)
+    ;print(word "Number of runners:" number-of-runners)
     set shape "person"
     set color brown
     set size 1
@@ -61,8 +63,11 @@ to setup-runners
     set finish-time 0
     set speed-consistency 0
     set dropped-out? false
+    ;setxy x-pos (min-pycor + 1)
     move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
     set heading 90
+    ;set x-pos (x-pos + x-spacing)
+
   ]
 end
 
@@ -98,7 +103,7 @@ to go
     check-if-dropped-out
     ;interact-with-nearby-spectators
     ;interact-with-nearby-pacers
-    check-if-finished
+    ;check-if-finished
   ]
 ;  ask pacers [
 ;    move-pacers
@@ -132,14 +137,14 @@ to move-runners
     ]
     setxy (xcor + x-offset - 1) ycor
   ]
-  ;interact-with-nearby-runners
+  interact-with-nearby-runners
 end
 
 to check-if-dropped-out
   if motivation < 0.2 or endurance < 0.2 [
     set dropped-out? true
-    set color gray
-    stop
+    set color black
+    ;stop
   ]
 end
 
