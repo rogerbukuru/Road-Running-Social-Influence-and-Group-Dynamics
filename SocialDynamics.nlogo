@@ -3,7 +3,8 @@ breed [spectators spectator]
 breed [pacers pacer]
 
 runners-own [
-  speed
+  base-speed
+  current-speed
   endurance
   motivation
   social-influence-susceptibility
@@ -32,6 +33,7 @@ globals [
   social-influence-radius
   track-size
   lawn-size
+  lap-length-in-patches
 ]
 
 to setup
@@ -63,6 +65,12 @@ end
 
 to setup-race-total-laps
   set laps-required race-distance / 1
+  ;set lap-length-in-patches 33 * 4
+  ; Assuming total width of the environment (T) and width of the lawn (W)
+  ;let total-width 32 ; This would be the total width from one end to the other of the environment.
+  ;let lawn-width 24 ; This is the width of the lawn, so 12 patches from the center to each side.
+  ;let track_width (total-width - lawn-width) / 2 ; This calculates the width of the track itself.
+  ;let lap_length_in_patches track_width * 4 ; Since it's a square track, multiply by 4.
 end
 
 to setup-runners
@@ -76,14 +84,21 @@ to setup-runners
   ; Calculate spacing if needed, to distribute runners along the start line.
   let spacing number-of-runners / start-line-length   ; This could be adjusted based on the number of runners and the length of the start line.
 
+  let global-base-pace 6.28 ; average global base pace in minutes per km
+  let global-space-sd 1     ;standard deviation for variability in pace
 
   create-runners number-of-runners [
     ;print(word "Number of runners:" number-of-runners)
     set shape "person"
     ;set color brown
     set size 1.5
-    set speed random-float 1.0
-    set endurance 10
+
+    set base-speed random-normal global-base-pace global-space-sd
+    set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
+    set current-speed base-speed
+    print(Word "Runner: " who " has a base speed of: " base-speed " and a current speed of " current-speed)
+
+    set endurance 100
     set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
       ; Assign colors based on social-influence-susceptibility
@@ -103,7 +118,7 @@ to setup-runners
       ]
     ]
     set finish-time 0
-    set speed-consistency 0
+    ;set speed-consistency 0
     set dropped-out? false
     ;setxy x-pos (min-pycor + 1)
     set group-id -1
@@ -155,7 +170,7 @@ to go
   ]
   ask runners [
     move-runners
-    update-runner-attributes
+    ;update-runner-attributes
     form-running-groups
     ;check-if-dropped-out
     ;interact-with-nearby-spectators
@@ -174,6 +189,18 @@ to move-runners
   ; Detect potential collision directly ahead and calculate available space for lateral movement.
   ask runners [
   if not finished-race?[
+
+   ; Additional check for lateral position correction near the start/finish line.
+  if (pycor = -11) [ ; If near the start/finish line
+    let desired_xcor -15 ; Adjust this value based on your track layout.
+    if (abs(pxcor - desired_xcor) > 5) [ ; If too far from the desired position
+      set xcor desired_xcor ; Nudge runner towards a position where their lap will count.
+    ]
+  ]
+
+
+
+
   let ahead-patch patch-ahead 1
   let collision-ahead? any? other runners with [patch-here = ahead-patch]
 
@@ -191,11 +218,18 @@ to move-runners
     ]
   ]
 
-  ; Move forward after lateral movement decision.
-  fd speed
-  update-laps-completed
-  ; Adjust heading at track boundaries to stay within the track.
-  adjust-heading-at-boundaries
+    ; Calculate and execute forward movement based on speed and lap length.
+    ; Assuming 1 lap = 1 kilometer = lap-length-in-patches patches in this example.
+    ; This means a runner with a speed of 5 min/km moves 20 patches per tick.
+    ;let patches-per-tick lap-length-in-patches / current-speed
+    ;print(word "Runner: " who " is running at " patches-per-tick " patches per tick")
+    fd current-speed ;patches-per-tick
+
+    ; Move forward after lateral movement decision.
+    ;fd speed
+    update-laps-completed
+    ; Adjust heading at track boundaries to stay within the track.
+    adjust-heading-at-boundaries
   ]
   ]
 end
@@ -244,9 +278,9 @@ to form-running-groups
       let nearby-runners other runners in-radius 2
       ifelse any? nearby-runners [
       ; Find the runner with the closest speed
-      let closest-runner min-one-of nearby-runners [abs (speed - [speed] of myself)]
-      let closest-speed [speed] of closest-runner
-      let speed-diff abs (speed - closest-speed)
+      let closest-runner min-one-of nearby-runners [abs (current-speed - [current-speed] of myself)]
+      let closest-speed [current-speed] of closest-runner
+      let speed-diff abs (current-speed - closest-speed)
 
       ; If the speed difference is within the tolerance range
       if speed-diff <= 0.1 [
@@ -333,7 +367,7 @@ to update-runner-attributes
     ; Ensure endurance doesn't drop below 0.
     if endurance < 0 [
       set endurance 0
-      die
+      ;die
     ]
 
     ; Update speed based on current motivation and endurance.
@@ -345,36 +379,48 @@ end
 to update-speed
   ; Adjust speed based on the current motivation and endurance levels, with checks to prevent it from going too low.
   ifelse motivation > 0.5 and endurance > 0.5 [
-    set speed min(list (speed * 1.05) 1.0)  ; Can increase speed up to a limit.
+    set current-speed min(list (current-speed * 1.05) 4.28)  ; Can increase speed up to a limit.
   ] [
-    set speed max(list (speed * 0.95) 0.1)  ; Ensure speed doesn't drop below a minimum.
+    set current-speed max(list (current-speed * 0.95) 8.28)  ; Ensure speed doesn't drop below a minimum.
   ]
 end
 
 
 to update-laps-completed
   ask runners [
-    let at_start_finish_line (pycor = -11 and pxcor >= -16 and pxcor < (-16 + 6))
-    if at_start_finish_line and not just-crossed-line? [
+    let at_start_finish_line (pycor = -11 and pxcor >= -13 and pxcor < (-16 + 10))
+    ;print(word "Just crossed line: " just-crossed-line?)
+    ;print(word "At start/finish line: " at_start_finish_line)
+    ifelse at_start_finish_line and not just-crossed-line? [
+      print("Hello")
       if laps-completed < laps-required [
         set laps-completed laps-completed + 1
-        ;print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
+        print("Hello...")
+        set just-crossed-line? true
+        print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
       ]
-      set just-crossed-line? true
+
+    ][
+      ;print("Hello 89")
+      if not at_start_finish_line [
+        set just-crossed-line? false
+      ]
     ]
-    if not at_start_finish_line [
-      set just-crossed-line? false
-    ]
+
     if laps-completed >= laps-required and not finished-race? [
-      move-to one-of patches with [pcolor = green]  ; Direct finished runners to the lawn.
-      set finished-race? true
-      set finish-time ticks
-      print(word "Runner group id: " group-id)
-      ;print (word "Runner " who " has completed the race at tick: " ticks)
+      complete-race
     ]
   ]
 end
 
+
+to complete-race  ; A new procedure for handling race completion.
+  ; Assuming 1 tick = 1 minute for simplicity, adjust as necessary.
+  set finished-race? true
+  set finish-time ticks
+  move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
+  print (word "Runner " who " completed the race in " finish-time " minutes.")
+end
 
 to analyze-group-running-results
   if all? runners [finished-race?] [
@@ -387,8 +433,8 @@ to analyze-group-running-results
     let avg-group-time ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0]
     let avg-solo-time ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0]
 
-    let avg-group-speed ifelse-value (count group-runners > 0) [mean [speed] of group-runners] [0]
-    let avg-solo-speed ifelse-value (count solo-runners > 0) [mean [speed] of solo-runners] [0]
+    let avg-group-speed ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0]
+    let avg-solo-speed ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0]
 
     print (word "Average group finish time: " avg-group-time)
     print (word "Average solo finish time: " avg-solo-time)
@@ -397,7 +443,12 @@ to analyze-group-running-results
   ]
 end
 
-
+; Assuming finish-time is in minutes
+to-report formatted-time [time-minutes]
+  let minutes floor time-minutes
+  let seconds round (time-minutes - minutes) * 60
+  report (word minutes "m " seconds "s")
+end
 
 
 ;to-report avg-group-runner-speed
@@ -449,7 +500,7 @@ to interact-with-nearby-pacers
     let most-visible-pacer max-one-of nearby-pacers [visibility]
     if random-float 1.0 < [visibility] of most-visible-pacer [
       set following-pacer? true
-      set speed [set-pace] of most-visible-pacer
+      set current-speed [set-pace] of most-visible-pacer
       ask most-visible-pacer [set group-size group-size + 1]
     ]
   ]
@@ -461,7 +512,7 @@ to maintain-pace
   ; Example:
   fd set-pace
   if group-size > 0 [
-    let average-runner-speed mean [speed] of runners with [following-pacer? and distance myself < social-influence-radius]
+    let average-runner-speed mean [current-speed] of runners with [following-pacer? and distance myself < social-influence-radius]
     set set-pace set-pace * 0.9 + average-runner-speed * 0.1
   ]
 end
@@ -475,7 +526,7 @@ to gather-runners
     ask nearby-runners [
       if random-float 1.0 < [visibility] of myself [
         set following-pacer? true
-        set speed [set-pace] of myself
+        set current-speed [set-pace] of myself
         ask myself [set group-size group-size + 1]
       ]
     ]
@@ -483,10 +534,10 @@ to gather-runners
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-332
-18
-975
-662
+277
+17
+920
+661
 -1
 -1
 19.242424242424246
@@ -550,9 +601,9 @@ SLIDER
 279
 number-of-runners
 number-of-runners
-2
+1
 20
-8.0
+1.0
 1
 1
 NIL
@@ -614,6 +665,17 @@ race-distance
 race-distance
 5 10 21 42.5
 0
+
+MONITOR
+110
+508
+193
+553
+Finish Time
+formatted-time
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
