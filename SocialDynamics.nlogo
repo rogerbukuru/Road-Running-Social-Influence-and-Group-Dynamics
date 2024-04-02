@@ -178,7 +178,7 @@ to set-speed [generated-speed]
 
    ; Convert adjusted seconds back to a fraction of a minute and add to minutes
    set current-speed minutes + (adjusted-seconds / 100)
-   print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " minutes per km")
+   ;print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " minutes per km")
 end
 
 
@@ -191,7 +191,7 @@ to go
   ]
   ask runners [
     move-runners
-    ;update-runner-attributes
+    update-runner-attributes
     form-running-groups
     ;check-if-dropped-out
     ;interact-with-nearby-spectators
@@ -400,33 +400,6 @@ to update-speed
 end
 
 
-;to update-laps-completed
-;  ask runners [
-;    ; Assuming -16 is the x-coordinate for the start/finish line and -11 is the y-coordinate
-;    let prev-ycor ycor - [dy] of self ; Calculate the previous y-coordinate based on current position and direction
-;    print(word "Prev y-cor " prev-ycor)
-;    let crossed-line? (prev-ycor > -11 and ycor <= -11) or (prev-ycor < -11 and ycor >= -11) ;or (prev-ycor > -11 and ycor >= -11)
-;    print(word "Runner current x position: " pxcor " and y position: " pycor)
-;
-;    if crossed-line? and pxcor >= -16 and pxcor < (-16 + 6) [
-;      if laps-completed < laps-required [
-;        set laps-completed laps-completed + 1
-;        print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
-;      ]
-;      if not just-crossed-line? [
-;        set just-crossed-line? true
-;      ]
-;    ]
-;
-;    if not crossed-line? [
-;      set just-crossed-line? false
-;    ]
-;
-;    if laps-completed >= laps-required and not finished-race? [
-;      complete-race
-;    ]
-;  ]
-;end
 
 to update-laps-completed
   ask runners [
@@ -435,7 +408,7 @@ to update-laps-completed
     set laps-completed floor ((total-distance * lap-length-in-patches)  / lap-length-in-patches)
     ;print(word "Laps completed " laps-completed)
     if laps-completed > laps-completed-before [
-      print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
+      ;print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
     ]
     if laps-completed >= laps-required and not finished-race? [
       complete-race
@@ -645,7 +618,7 @@ number-of-runners
 number-of-runners
 1
 20
-1.0
+5.0
 1
 1
 NIL
