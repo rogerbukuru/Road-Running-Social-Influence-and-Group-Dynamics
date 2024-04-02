@@ -16,6 +16,7 @@ runners-own [
   laps-completed
   just-crossed-line?
   finished-race?
+  total-distance
 ]
 
 spectators-own [
@@ -65,7 +66,7 @@ end
 
 to setup-race-total-laps
   set laps-required race-distance / 1
-  ;set lap-length-in-patches 33 * 4
+  set lap-length-in-patches (33 * 4)
   ; Assuming total width of the environment (T) and width of the lawn (W)
   ;let total-width 32 ; This would be the total width from one end to the other of the environment.
   ;let lawn-width 24 ; This is the width of the lawn, so 12 patches from the center to each side.
@@ -95,8 +96,7 @@ to setup-runners
 
     set base-speed random-normal global-base-pace global-space-sd
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
-    set current-speed base-speed
-    print(Word "Runner: " who " has a base speed of: " base-speed " and a current speed of " current-speed)
+    set-speed base-speed
 
     set endurance 100
     set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
@@ -124,12 +124,14 @@ to setup-runners
     set group-id -1
     ;move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -12 ]
     set laps-completed 0
+    set total-distance 0
     set just-crossed-line? true  ; Prevent initial lap increase.
 
     ; Position runners on the start line.
     let assigned-x start-line-x-start + (who mod start-line-length) * spacing
     let assigned-y start-line-y
     setxy assigned-x assigned-y
+    ;print(word "Runner starting x position: " pxcor " and y position: " pycor)
     set finished-race? false
     set heading 0
     ;set x-pos (x-pos + x-spacing)
@@ -162,6 +164,25 @@ to setup-pacers
   ]
 end
 
+to set-speed [generated-speed]
+   ; Ensure the fractional part of the speed does not exceed .59 by converting excess seconds to minutes
+   let minutes floor generated-speed ; Whole number part of minutes
+   let seconds round ((generated-speed - minutes) * 100) ; Convert fractional part to seconds
+
+   ; Calculate additional minutes from excess seconds and adjust seconds to be within 0-59
+   let extra-minutes floor (seconds / 60)
+   let adjusted-seconds seconds mod 60
+
+   ; Adjust minutes with any additional minutes from seconds
+   set minutes minutes + extra-minutes
+
+   ; Convert adjusted seconds back to a fraction of a minute and add to minutes
+   set current-speed minutes + (adjusted-seconds / 100)
+   print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " minutes per km")
+end
+
+
+
 to go
   if all? runners [finished-race?] [
     print "All runners have finished the race."
@@ -190,16 +211,6 @@ to move-runners
   ask runners [
   if not finished-race?[
 
-   ; Additional check for lateral position correction near the start/finish line.
-  if (pycor = -11) [ ; If near the start/finish line
-    let desired_xcor -15 ; Adjust this value based on your track layout.
-    if (abs(pxcor - desired_xcor) > 5) [ ; If too far from the desired position
-      set xcor desired_xcor ; Nudge runner towards a position where their lap will count.
-    ]
-  ]
-
-
-
 
   let ahead-patch patch-ahead 1
   let collision-ahead? any? other runners with [patch-here = ahead-patch]
@@ -218,15 +229,18 @@ to move-runners
     ]
   ]
 
+
     ; Calculate and execute forward movement based on speed and lap length.
     ; Assuming 1 lap = 1 kilometer = lap-length-in-patches patches in this example.
     ; This means a runner with a speed of 5 min/km moves 20 patches per tick.
-    ;let patches-per-tick lap-length-in-patches / current-speed
+    let patches-per-tick lap-length-in-patches / current-speed
     ;print(word "Runner: " who " is running at " patches-per-tick " patches per tick")
-    fd current-speed ;patches-per-tick
+    fd patches-per-tick ;current-speed ;
+    let distance-per-tick (1 / current-speed) ; Distance covered in 1 tick (minute), in kilometers
+    ;print(word "Distance per tick " distance-per-tick)
+    set total-distance total-distance + distance-per-tick
+    ;print(word "Distance traveled " total-distance)
 
-    ; Move forward after lateral movement decision.
-    ;fd speed
     update-laps-completed
     ; Adjust heading at track boundaries to stay within the track.
     adjust-heading-at-boundaries
@@ -386,27 +400,43 @@ to update-speed
 end
 
 
+;to update-laps-completed
+;  ask runners [
+;    ; Assuming -16 is the x-coordinate for the start/finish line and -11 is the y-coordinate
+;    let prev-ycor ycor - [dy] of self ; Calculate the previous y-coordinate based on current position and direction
+;    print(word "Prev y-cor " prev-ycor)
+;    let crossed-line? (prev-ycor > -11 and ycor <= -11) or (prev-ycor < -11 and ycor >= -11) ;or (prev-ycor > -11 and ycor >= -11)
+;    print(word "Runner current x position: " pxcor " and y position: " pycor)
+;
+;    if crossed-line? and pxcor >= -16 and pxcor < (-16 + 6) [
+;      if laps-completed < laps-required [
+;        set laps-completed laps-completed + 1
+;        print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
+;      ]
+;      if not just-crossed-line? [
+;        set just-crossed-line? true
+;      ]
+;    ]
+;
+;    if not crossed-line? [
+;      set just-crossed-line? false
+;    ]
+;
+;    if laps-completed >= laps-required and not finished-race? [
+;      complete-race
+;    ]
+;  ]
+;end
+
 to update-laps-completed
   ask runners [
-    let at_start_finish_line (pycor = -11 and pxcor >= -13 and pxcor < (-16 + 10))
-    ;print(word "Just crossed line: " just-crossed-line?)
-    ;print(word "At start/finish line: " at_start_finish_line)
-    ifelse at_start_finish_line and not just-crossed-line? [
-      print("Hello")
-      if laps-completed < laps-required [
-        set laps-completed laps-completed + 1
-        print("Hello...")
-        set just-crossed-line? true
-        print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
-      ]
-
-    ][
-      ;print("Hello 89")
-      if not at_start_finish_line [
-        set just-crossed-line? false
-      ]
+    let laps-completed-before laps-completed
+    ;print(word "Laps completed before " laps-completed-before)
+    set laps-completed floor ((total-distance * lap-length-in-patches)  / lap-length-in-patches)
+    ;print(word "Laps completed " laps-completed)
+    if laps-completed > laps-completed-before [
+      print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
     ]
-
     if laps-completed >= laps-required and not finished-race? [
       complete-race
     ]
@@ -436,10 +466,22 @@ to analyze-group-running-results
     let avg-group-speed ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0]
     let avg-solo-speed ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0]
 
-    print (word "Average group finish time: " avg-group-time)
-    print (word "Average solo finish time: " avg-solo-time)
-    print (word "Average group speed: " avg-group-speed)
-    print (word "Average solo speed: " avg-solo-speed)
+
+    let avg-distance mean [total-distance] of runners
+    let avg-group-distance ifelse-value (count group-runners > 0) [mean [total-distance] of group-runners] [0]
+    let avg-solo-distance ifelse-value (count solo-runners > 0) [mean [total-distance] of solo-runners] [0]
+
+    print (word "Race distance: " precision race-distance 2 " km")
+    print (word "Average distance: " precision avg-distance 2 " km")
+
+    ;print (word "Average group finish time: " precision  avg-group-time 2" minutes")
+    ;print (word "Average solo finish time: " precision  avg-solo-time 2" minutes")
+
+    print (word "Average group finish time: " precision  ( avg-group-speed * avg-group-distance)  2" minutes")
+    print (word "Average solo finish time: " precision  ( avg-solo-speed * avg-solo-distance ) 2" minutes")
+
+    print (word "Average group speed: " precision  avg-group-speed 2 " min/km")
+    print (word "Average solo speed: " precision avg-solo-speed 2 " min/km")
   ]
 end
 
@@ -664,7 +706,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-0
+3
 
 MONITOR
 110
