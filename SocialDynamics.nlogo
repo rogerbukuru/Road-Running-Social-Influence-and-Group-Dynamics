@@ -178,7 +178,8 @@ to set-speed [generated-speed]
 
    ; Convert adjusted seconds back to a fraction of a minute and add to minutes
    set current-speed minutes + (adjusted-seconds / 100)
-   ;print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " minutes per km")
+   set current-speed  current-speed * 60 ; convert speed from km/m to km/s
+   print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km")
 end
 
 
@@ -230,9 +231,7 @@ to move-runners
   ]
 
 
-    ; Calculate and execute forward movement based on speed and lap length.
-    ; Assuming 1 lap = 1 kilometer = lap-length-in-patches patches in this example.
-    ; This means a runner with a speed of 5 min/km moves 20 patches per tick.
+
     let patches-per-tick lap-length-in-patches / current-speed
     ;print(word "Runner: " who " is running at " patches-per-tick " patches per tick")
     fd patches-per-tick ;current-speed ;
@@ -240,6 +239,7 @@ to move-runners
     ;print(word "Distance per tick " distance-per-tick)
     set total-distance total-distance + distance-per-tick
     ;print(word "Distance traveled " total-distance)
+
 
     update-laps-completed
     ; Adjust heading at track boundaries to stay within the track.
@@ -393,9 +393,9 @@ end
 to update-speed
   ; Adjust speed based on the current motivation and endurance levels, with checks to prevent it from going too low.
   ifelse motivation > 0.5 and endurance > 0.5 [
-    set current-speed min(list (current-speed * 1.05) 4.28)  ; Can increase speed up to a limit.
+    set current-speed min(list (current-speed * 1.05) (4.28 * 60))  ; Can increase speed up to a limit.
   ] [
-    set current-speed max(list (current-speed * 0.95) 8.28)  ; Ensure speed doesn't drop below a minimum.
+    set current-speed max(list (current-speed * 0.95) (8.28 * 60 ) )  ; Ensure speed doesn't drop below a minimum.
   ]
 end
 
@@ -420,7 +420,7 @@ end
 to complete-race  ; A new procedure for handling race completion.
   ; Assuming 1 tick = 1 minute for simplicity, adjust as necessary.
   set finished-race? true
-  set finish-time ticks
+  set finish-time ticks / 60
   move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
   print (word "Runner " who " completed the race in " finish-time " minutes.")
 end
@@ -433,11 +433,12 @@ to analyze-group-running-results
     print(word "Total solo runners " count solo-runners)
 
     ; Use count to check if the agentset is empty
-    let avg-group-time ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0]
-    let avg-solo-time ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0]
+    let avg-group-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] ) / 60
+    let avg-solo-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] ) / 60
 
-    let avg-group-speed ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0]
-    let avg-solo-speed ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0]
+    let avg-group-speed ( ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0] ) / 60
+    let avg-solo-speed ( ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0] ) / 60
+
 
 
     let avg-distance mean [total-distance] of runners
@@ -618,7 +619,7 @@ number-of-runners
 number-of-runners
 1
 20
-5.0
+1.0
 1
 1
 NIL
@@ -679,7 +680,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-3
+2
 
 MONITOR
 110
