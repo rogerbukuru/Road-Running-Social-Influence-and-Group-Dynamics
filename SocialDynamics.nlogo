@@ -380,7 +380,7 @@ to update-runner-attributes
       set motivation max list 0 min list motivation 1
 
       ; Adjust endurance based on motivation and possibly speed
-      let endurance_decrease_rate 0.00001 + (0.5 - motivation) * 0.00001
+      let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
       set endurance endurance - endurance_decrease_rate
       ;print(word "Runner " who "endurance is " endurance)
       let speed-to-endurance-ratio 0
@@ -414,7 +414,7 @@ to drop-out
   ; Mark the runner as dropped out
   set dropped-out? true
   set finish-time ticks / 60  ; Record the time in minutes at the moment of dropping out
-  print (word "Runner " who " has dropped out at time: " precision finish-time 2 " minutes and speed of " current-speed " m/km")
+  print (word "Runner " who " has dropped out at time: " precision finish-time 2 " minutes \n and speed of " precision current-speed 2 " m/km and endurance of " endurance " \n and motivation " motivation)
   set color red ; Indicative of dropping out
   ; Move to a designated area or disappear from the race
   move-to one-of patches with [pcolor = green]
