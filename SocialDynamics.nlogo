@@ -97,8 +97,8 @@ to setup-runners
     set base-speed random-normal global-base-pace global-space-sd
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
     set-speed base-speed
-
-    set endurance 100
+    print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km and " (current-speed / 60) " m/km")
+    set endurance 1.0
     set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
       ; Assign colors based on social-influence-susceptibility
@@ -179,14 +179,15 @@ to set-speed [generated-speed]
    ; Convert adjusted seconds back to a fraction of a minute and add to minutes
    set current-speed minutes + (adjusted-seconds / 100)
    set current-speed  current-speed * 60 ; convert speed from km/m to km/s
-   print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km")
 end
 
 
 
 to go
-  if all? runners [finished-race?] [
-    print "All runners have finished the race."
+
+  if all? runners [finished-race? or dropped-out?] [
+    print "All runners have finished the race or dropped out."
+    print (word "Simulation ends at time: " precision (ticks / 60) 2 " minutes.")
     analyze-group-running-results
     stop
   ]
@@ -209,7 +210,7 @@ end
 
 to move-runners
   ; Detect potential collision directly ahead and calculate available space for lateral movement.
-  ask runners [
+  ;ask runners [
   if not finished-race?[
 
 
@@ -245,7 +246,7 @@ to move-runners
     ; Adjust heading at track boundaries to stay within the track.
     adjust-heading-at-boundaries
   ]
-  ]
+  ;]
 end
 
 ; Helper procedure to move runners laterally without direct xcor/ycor manipulation.
@@ -311,7 +312,7 @@ to form-running-groups
 
     ][
     ; If the runner is pink and there are no other pink runners within a certain radius
-    if color = pink and not any? other runners in-radius 4 with [color = pink] [
+    if color = pink and not any? other runners in-radius 3 with [color = pink] [
         ; instead of immediately reverting color, mark this runner for reversion
         set group-id -2  ; Using -2 as an example mark for reversion
         ;revert-color-based-on-quantile
@@ -361,43 +362,64 @@ end
 
 to update-runner-attributes
   ask runners [
-    ; Adjust motivation if in a group or not.
-    ifelse group-id != -1 [
-      let group-mates runners with [group-id = [group-id] of myself]
-      let group-average-motivation mean [motivation] of group-mates
-      set motivation (motivation + group-average-motivation) / 2
-    ] [
-      ; Decrease motivation faster for highly susceptible runners not in a group.
-      if social-influence-susceptibility > 0.5 [
-        set motivation motivation - 0.01  ; Adjust as needed.
+    if not dropped-out? [
+      ; Adjust motivation
+      ifelse group-id = -1 [ ; Not in a group
+        ifelse social-influence-susceptibility > 0.5 [
+          set motivation motivation - 0.02 ; Increased motivation decrease for highly susceptible runners
+        ]  [
+          set motivation motivation - 0.01 ; Standard motivation decrease
+        ]
+      ]  [ ; In a group
+        let group-mates runners with [group-id = [group-id] of myself]
+        let group-motivation mean [motivation] of group-mates
+        set motivation (motivation + group-motivation) / 2 ; Adjust motivation towards group average
       ]
-    ]
-    if motivation < 0 [ set motivation 0 ]
-    ; Decrease endurance at a rate influenced by current motivation.
-    ; Endurance decreases slower if motivation is high, simulating sustained effort.
-    let endurance_decrease_rate 0.001 - (0.0005 * motivation)
-    set endurance endurance - endurance_decrease_rate
 
-    ; Ensure endurance doesn't drop below 0.
-    if endurance < 0 [
-      set endurance 0
-      ;die
-    ]
+      ; Ensure motivation stays within bounds
+      set motivation max list 0 min list motivation 1
 
-    ; Update speed based on current motivation and endurance.
-    update-speed
+      ; Adjust endurance based on motivation and possibly speed
+      let endurance_decrease_rate 0.00001 + (0.5 - motivation) * 0.00001
+      set endurance endurance - endurance_decrease_rate
+      ;print(word "Runner " who "endurance is " endurance)
+      let speed-to-endurance-ratio 0
+      if race-distance >= 5 and race-distance <= 10 [
+       ; Middle distance run, 5km - 10km
+        set speed-to-endurance-ratio 3 / 2
+      ]
+      if race-distance = 21 [
+        ; Long distance run, 21km
+        set speed-to-endurance-ratio 1
+      ]
+       if race-distance >= 42 [
+       ; Full marathon, 42km
+        set speed-to-endurance-ratio  2 / 3
+      ]
+      ; Adjust speed
+      ifelse endurance <= 0 [
+       drop-out
+    ] [
+        set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
+        ;if ticks mod 60 = 0 [ ; Log every 60 ticks as an example
+         ; print (word "Runner " who " current speed: " (current-speed / 60) " m/km, total distance: " total-distance " km, time: " (ticks / 60) " minutes")
+        ;]
+      ]
+  ]
   ]
 end
 
+to drop-out
 
-to update-speed
-  ; Adjust speed based on the current motivation and endurance levels, with checks to prevent it from going too low.
-  ifelse motivation > 0.5 and endurance > 0.5 [
-    set current-speed min(list (current-speed * 1.05) (4.28 * 60))  ; Can increase speed up to a limit.
-  ] [
-    set current-speed max(list (current-speed * 0.95) (8.28 * 60 ) )  ; Ensure speed doesn't drop below a minimum.
-  ]
+  ; Mark the runner as dropped out
+  set dropped-out? true
+  set finish-time ticks / 60  ; Record the time in minutes at the moment of dropping out
+  print (word "Runner " who " has dropped out at time: " precision finish-time 2 " minutes and speed of " current-speed " m/km")
+  set color red ; Indicative of dropping out
+  ; Move to a designated area or disappear from the race
+  move-to one-of patches with [pcolor = green]
 end
+
 
 
 
@@ -422,7 +444,7 @@ to complete-race  ; A new procedure for handling race completion.
   set finished-race? true
   set finish-time ticks / 60
   move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
-  print (word "Runner " who " completed the race in " finish-time " minutes.")
+  print (word "Runner " who " completed the race in " precision finish-time 2 " minutes and a speed of " precision (current-speed / 60 ) 2 " m/km")
 end
 
 to analyze-group-running-results
@@ -433,8 +455,8 @@ to analyze-group-running-results
     print(word "Total solo runners " count solo-runners)
 
     ; Use count to check if the agentset is empty
-    let avg-group-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] ) / 60
-    let avg-solo-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] ) / 60
+    let avg-group-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] )
+    let avg-solo-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] )
 
     let avg-group-speed ( ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0] ) / 60
     let avg-solo-speed ( ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0] ) / 60
@@ -451,8 +473,8 @@ to analyze-group-running-results
     ;print (word "Average group finish time: " precision  avg-group-time 2" minutes")
     ;print (word "Average solo finish time: " precision  avg-solo-time 2" minutes")
 
-    print (word "Average group finish time: " precision  ( avg-group-speed * avg-group-distance)  2" minutes")
-    print (word "Average solo finish time: " precision  ( avg-solo-speed * avg-solo-distance ) 2" minutes")
+    print (word "Average group finish time: " precision  ( avg-group-time )  2" minutes")
+    print (word "Average solo finish time: " precision  ( avg-solo-time ) 2" minutes")
 
     print (word "Average group speed: " precision  avg-group-speed 2 " min/km")
     print (word "Average solo speed: " precision avg-solo-speed 2 " min/km")
@@ -619,7 +641,7 @@ number-of-runners
 number-of-runners
 1
 20
-1.0
+8.0
 1
 1
 NIL
