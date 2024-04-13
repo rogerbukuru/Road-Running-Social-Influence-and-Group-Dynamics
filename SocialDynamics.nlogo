@@ -17,6 +17,7 @@ runners-own [
   just-crossed-line?
   finished-race?
   total-distance
+  total-distance-in-a-group
 ]
 
 spectators-own [
@@ -87,6 +88,7 @@ to setup-runners
 
   let global-base-pace 6.28 ; average global base pace in minutes per km
   let global-space-sd 1     ;standard deviation for variability in pace
+  let runners-per-group number-of-runners /  number-of-groups
 
   create-runners number-of-runners [
     ;print(word "Number of runners:" number-of-runners)
@@ -134,6 +136,7 @@ to setup-runners
     ;print(word "Runner starting x position: " pxcor " and y position: " pycor)
     set finished-race? false
     set heading 0
+    set total-distance-in-a-group 0
     ;set x-pos (x-pos + x-spacing)
 
   ]
@@ -240,7 +243,9 @@ to move-runners
     ;print(word "Distance per tick " distance-per-tick)
     set total-distance total-distance + distance-per-tick
     ;print(word "Distance traveled " total-distance)
-
+     ;if social-influence-susceptibility > 0.5 [
+     calculate-distance-in-group distance-per-tick
+    ;]
 
     update-laps-completed
     ; Adjust heading at track boundaries to stay within the track.
@@ -284,7 +289,6 @@ end
 
 to form-running-groups
 
-
  ; Check if the runner's social-influence-susceptibility is high enough to form a group
   ;print(word "Social influence" social-influence-susceptibility)
   if not finished-race?[
@@ -299,7 +303,7 @@ to form-running-groups
 
       ; If the speed difference is within the tolerance range
       if speed-diff <= 0.1 [
-            ;print("Forming group")
+           ;print("Forming group")
         ; Form a group and change color to pink
         set color pink
         set group-id 1
@@ -359,7 +363,12 @@ to revert-color-based-on-quantile
 
 end
 
+to calculate-distance-in-group[distance-covered]
+  if group-id = 1 [
+     set total-distance-in-a-group   total-distance-in-a-group + distance-covered
+  ]
 
+end
 to update-runner-attributes
   ask runners [
     if not dropped-out? [
@@ -444,12 +453,12 @@ to complete-race  ; A new procedure for handling race completion.
   set finished-race? true
   set finish-time ticks / 60
   move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
-  print (word "Runner " who " completed the race in " precision finish-time 2 " minutes and a speed of " precision (current-speed / 60 ) 2 " m/km")
+  print (word "Runner " who " completed the race in " precision finish-time 2 " minutes and a speed of " precision (current-speed / 60 ) 2 " m/km. Distance in a group " precision total-distance-in-a-group 2 " km")
 end
 
 to analyze-group-running-results
   if all? runners [finished-race?] [
-    let group-runners runners with [group-id = 1 and finish-time > 0]
+    let group-runners runners with [( group-id = 1 and finish-time > 0 ) or total-distance-in-a-group >= race-distance / 2 ]
     let solo-runners runners with [group-id = -1 and finish-time > 0]
     print(word "Total group runners " count group-runners)
     print(word "Total solo runners " count solo-runners)
@@ -641,7 +650,7 @@ number-of-runners
 number-of-runners
 1
 20
-8.0
+12.0
 1
 1
 NIL
@@ -702,7 +711,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-2
+1
 
 MONITOR
 110
@@ -714,6 +723,21 @@ formatted-time
 17
 1
 11
+
+SLIDER
+0
+457
+173
+490
+number-of-groups
+number-of-groups
+0
+5
+0.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
