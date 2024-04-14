@@ -18,6 +18,7 @@ runners-own [
   finished-race?
   total-distance
   total-distance-in-a-group
+  group-runner
 ]
 
 spectators-own [
@@ -42,7 +43,16 @@ to setup
   clear-all
   setup-environment
   setup-race-total-laps
-  setup-runners
+  let total-solo-runners floor (number-of-runners * (percentage-of-solo-runners / 100))
+  let total-grouped-runners number-of-runners - total-solo-runners
+
+  if total-grouped-runners < 2 [
+    user-message "Not enough runners to form a group. Increase total runners or decrease solo-runner-percent."
+    stop
+  ]
+
+  setup-runners total-solo-runners total-grouped-runners
+  average-speed-for-group-runners
   setup-spectators
   ;setup-pacers
   reset-ticks
@@ -75,7 +85,7 @@ to setup-race-total-laps
   ;let lap_length_in_patches track_width * 4 ; Since it's a square track, multiply by 4.
 end
 
-to setup-runners
+to setup-runners [total-solo-runners total-grouped-runners]
   ;let x-spacing (2 * (max-pxcor - 1)) / (number-of-runners + 1)
   ;let x-pos (min-pxcor + 1 + x-spacing)
 
@@ -88,7 +98,6 @@ to setup-runners
 
   let global-base-pace 6.28 ; average global base pace in minutes per km
   let global-space-sd 1     ;standard deviation for variability in pace
-  let runners-per-group number-of-runners /  number-of-groups
 
   create-runners number-of-runners [
     ;print(word "Number of runners:" number-of-runners)
@@ -99,7 +108,6 @@ to setup-runners
     set base-speed random-normal global-base-pace global-space-sd
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
     set-speed base-speed
-    print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km and " (current-speed / 60) " m/km")
     set endurance 1.0
     set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
@@ -107,23 +115,23 @@ to setup-runners
     let q1 0.25  ; 25th percentile
     let q2 0.75  ; 75th percentile
 
-    ifelse social-influence-susceptibility <= q1 [
-      set color violet  ; Runners within the 25th percentile are violet
-      set social-influence-susceptibility-quantile "first"
-    ] [
-      ifelse social-influence-susceptibility <= q2 [
-        set color brown  ; Runners between the 25th and 75th percentile are brown
-        set social-influence-susceptibility-quantile "average"
-      ] [
-        set color orange  ; Runners above the 75th percentile are orange
-        set social-influence-susceptibility-quantile "third"
-      ]
-    ]
+;    ifelse social-influence-susceptibility <= q1 [
+;      set color violet  ; Runners within the 25th percentile are violet
+;      set social-influence-susceptibility-quantile "first"
+;    ] [
+;      ifelse social-influence-susceptibility <= q2 [
+;        set color brown  ; Runners between the 25th and 75th percentile are brown
+;        set social-influence-susceptibility-quantile "average"
+;      ] [
+;        set color orange  ; Runners above the 75th percentile are orange
+;        set social-influence-susceptibility-quantile "third"
+;      ]
+;    ]
+
     set finish-time 0
     ;set speed-consistency 0
     set dropped-out? false
     ;setxy x-pos (min-pycor + 1)
-    set group-id -1
     ;move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -12 ]
     set laps-completed 0
     set total-distance 0
@@ -138,9 +146,40 @@ to setup-runners
     set heading 0
     set total-distance-in-a-group 0
     ;set x-pos (x-pos + x-spacing)
+    place-runners-in-group  total-solo-runners
 
   ]
+
+
 end
+
+to place-runners-in-group [total-solo-runners]
+
+   ifelse ( who ) < total-solo-runners [
+      set group-id -1 ; indicate that these are solo runners
+      set group-runner false
+      set color white
+      print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km and " (current-speed / 60) " m/km")
+    ][
+    set group-id 0
+    set group-runner true
+    set color pink
+   ]
+end
+
+to average-speed-for-group-runners
+    ; Calculate the average base speed for the group
+    let group-runners runners with [group-id = 0]
+    let average-base-speed mean [base-speed] of group-runners
+
+    ; Set each group runner's speed to the group's average
+    ask group-runners [
+      set base-speed average-base-speed
+      set-speed base-speed
+      print (word "Runner: " who " has a base speed of " base-speed " and a current speed of: " current-speed " seconds per km and " (current-speed / 60) " m/km")
+    ]
+end
+
 
 to setup-spectators
   create-spectators number-of-spectators [
@@ -153,6 +192,23 @@ to setup-spectators
 
   ]
 end
+
+;to distribute-extra-runners [extra-runners]
+;  let start-index total-solo-runners + (runners-per-group * number-of-groups)
+;  ask n-of extra-runners runners with [who >= start-index] [
+;    let new-group-id random number-of-groups
+;    set group-id new-group-id
+;    set color scale-color red new-group-id 0 number-of-groups - 1
+;  ]
+;end
+;
+;to check-groups [extra-runners]
+;  if any? groups with [count runners with [group-id = [group-id] of myself] < 2] [
+;    user-message "One or more groups have fewer than two runners. Adjusting runner distribution..."
+;    distribute-extra-runners extra-runners ; Define this procedure to handle redistribution
+;  ]
+;end
+
 
 to setup-pacers
   create-pacers number-of-pacers [
@@ -194,10 +250,12 @@ to go
     analyze-group-running-results
     stop
   ]
+
   ask runners [
     move-runners
     update-runner-attributes
     form-running-groups
+    ;leave-group
     ;check-if-dropped-out
     ;interact-with-nearby-spectators
     ;interact-with-nearby-pacers
@@ -291,10 +349,10 @@ to form-running-groups
 
  ; Check if the runner's social-influence-susceptibility is high enough to form a group
   ;print(word "Social influence" social-influence-susceptibility)
-  if not finished-race?[
+  if not finished-race? and group-runner [
   ifelse social-influence-susceptibility > 0.5 [
       ; Check for nearby runners based on distance
-      let nearby-runners other runners in-radius 2
+      let nearby-runners other runners in-radius 2 with [group-runner = true]
       ifelse any? nearby-runners [
       ; Find the runner with the closest speed
       let closest-runner min-one-of nearby-runners [abs (current-speed - [current-speed] of myself)]
@@ -306,21 +364,23 @@ to form-running-groups
            ;print("Forming group")
         ; Form a group and change color to pink
         set color pink
-        set group-id 1
+        set group-id 0
         ;set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
         ask closest-runner [
           set color pink
-          set group-id 1
+          set group-id 0
         ]
       ]
 
     ][
     ; If the runner is pink and there are no other pink runners within a certain radius
-    if color = pink and not any? other runners in-radius 3 with [color = pink] [
-        ; instead of immediately reverting color, mark this runner for reversion
-        set group-id -2  ; Using -2 as an example mark for reversion
-        ;revert-color-based-on-quantile
-      ]
+;    if color = pink and not any? other runners in-radius 3 with [color = pink] [
+;        ; instead of immediately reverting color, mark this runner for reversion
+;        set group-id -2  ; Using -2 as an example mark for reversion
+;        ;revert-color-based-on-quantile
+;      ]
+        ;print(word "Runner " who " dropped out of group")
+        set group-id -2
 
     ]
 
@@ -346,6 +406,35 @@ to form-running-groups
 
 end
 
+to leave-group
+  if not finished-race? and group-id != -1 [
+
+    let nearby-runners other runners in-radius 2 with [group-id = 0]
+      if not any? nearby-runners [
+           set group-id -1
+           set color red
+      ]
+;      ifelse any? nearby-runners [
+;      ; Find the runner with the closest speed
+;      let closest-runner min-one-of nearby-runners [abs (current-speed - [current-speed] of myself)]
+;      let closest-speed [current-speed] of closest-runner
+;      let speed-diff abs (current-speed - closest-speed)
+;
+;      ; If the speed difference is within the tolerance range
+;      if speed-diff <= 0.1 [
+;           ;print("Forming group")
+;        ; Form a group and change color to pink
+;        set color pink
+;        set group-id 1
+;        ;set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
+;        ask closest-runner [
+;          set color pink
+;          set group-id 1
+;        ]
+;      ]
+;    ]
+  ]
+end
 
 to revert-color-based-on-quantile
   ; Change color back to the original color based on social-influence-susceptibility quantile
@@ -364,7 +453,7 @@ to revert-color-based-on-quantile
 end
 
 to calculate-distance-in-group[distance-covered]
-  if group-id = 1 [
+  if group-id = 0 [
      set total-distance-in-a-group   total-distance-in-a-group + distance-covered
   ]
 
@@ -373,15 +462,17 @@ to update-runner-attributes
   ask runners [
     if not dropped-out? [
       ; Adjust motivation
-      ifelse group-id = -1 [ ; Not in a group
+      ifelse group-id != 0 [ ; Not in a group
         ifelse social-influence-susceptibility > 0.5 [
           set motivation motivation - 0.02 ; Increased motivation decrease for highly susceptible runners
         ]  [
           set motivation motivation - 0.01 ; Standard motivation decrease
         ]
       ]  [ ; In a group
+        set motivation motivation - 0.0001 ; Standard motivation decrease
         let group-mates runners with [group-id = [group-id] of myself]
         let group-motivation mean [motivation] of group-mates
+        ;print(word "Group motivation" group-motivation)
         set motivation (motivation + group-motivation) / 2 ; Adjust motivation towards group average
       ]
 
@@ -458,7 +549,7 @@ end
 
 to analyze-group-running-results
   if all? runners [finished-race?] [
-    let group-runners runners with [( group-id = 1 and finish-time > 0 ) or total-distance-in-a-group >= race-distance / 2 ]
+    let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.7 and finish-time > 0 ) ]
     let solo-runners runners with [group-id = -1 and finish-time > 0]
     print(word "Total group runners " count group-runners)
     print(word "Total solo runners " count solo-runners)
@@ -711,7 +802,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-1
+0
 
 MONITOR
 110
@@ -725,15 +816,15 @@ formatted-time
 11
 
 SLIDER
+2
+569
+234
+602
+percentage-of-solo-runners
+percentage-of-solo-runners
 0
-457
-173
-490
-number-of-groups
-number-of-groups
-0
-5
-0.0
+100
+50.0
 1
 1
 NIL
