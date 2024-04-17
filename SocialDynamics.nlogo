@@ -109,7 +109,7 @@ to setup-runners [total-solo-runners total-grouped-runners]
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
     set-speed base-speed
     set endurance 1.0
-    set motivation min (list 1 max (list 0 random-normal 0.5 0.3))
+    set motivation 1.0 ;min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
       ; Assign colors based on social-influence-susceptibility
     let q1 0.25  ; 25th percentile
@@ -188,8 +188,6 @@ to setup-spectators
     set size 1
     set cheering-intensity random-float 1.0
     move-to one-of patches with [ pcolor = green and abs(pxcor) < 14 and abs(pycor) < 14 ]
-
-
   ]
 end
 
@@ -407,13 +405,9 @@ to form-running-groups
 end
 
 to leave-group
-  if not finished-race? and group-id != -1 [
+  if not finished-race? and group-runner = true and group-id != 0 [
 
-    let nearby-runners other runners in-radius 2 with [group-id = 0]
-      if not any? nearby-runners [
-           set group-id -1
-           set color red
-      ]
+   print(word "Runner " who " dropped out of group, social influence" social-influence-susceptibility)
 ;      ifelse any? nearby-runners [
 ;      ; Find the runner with the closest speed
 ;      let closest-runner min-one-of nearby-runners [abs (current-speed - [current-speed] of myself)]
@@ -463,10 +457,18 @@ to update-runner-attributes
     if not dropped-out? [
       ; Adjust motivation
       ifelse group-id != 0 [ ; Not in a group
-        ifelse social-influence-susceptibility > 0.5 [
-          set motivation motivation - 0.02 ; Increased motivation decrease for highly susceptible runners
+        ifelse group-runner = true [
+
+          ifelse social-influence-susceptibility > 0.5 [
+            ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
+            set motivation motivation - 0.002
+            ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
+          ][
+            set motivation motivation - 0.001 ; Increased motivation decrease for highly susceptible runners
+            ;print(word "Runner " who " motivation decrease to " motivation " group id " group-id)
+          ]
         ]  [
-          set motivation motivation - 0.01 ; Standard motivation decrease
+          set motivation motivation - 0.001 ; Standard motivation decrease
         ]
       ]  [ ; In a group
         set motivation motivation - 0.0001 ; Standard motivation decrease
@@ -477,7 +479,7 @@ to update-runner-attributes
       ]
 
       ; Ensure motivation stays within bounds
-      set motivation max list 0 min list motivation 1
+      ;set motivation max list 0 min list motivation 1
 
       ; Adjust endurance based on motivation and possibly speed
       let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
@@ -500,6 +502,9 @@ to update-runner-attributes
       ifelse endurance <= 0 [
        drop-out
     ] [
+;        if group-id = 0 [ ; Not in a group
+;          print(word "Runner " who " base speed " base-speed "current speed " current-speed)
+;        ]
         set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
         ;if ticks mod 60 = 0 [ ; Log every 60 ticks as an example
          ; print (word "Runner " who " current speed: " (current-speed / 60) " m/km, total distance: " total-distance " km, time: " (ticks / 60) " minutes")
@@ -741,7 +746,7 @@ number-of-runners
 number-of-runners
 1
 20
-12.0
+5.0
 1
 1
 NIL
@@ -802,7 +807,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-0
+1
 
 MONITOR
 110
@@ -816,15 +821,30 @@ formatted-time
 11
 
 SLIDER
-2
-569
-234
-602
+0
+563
+232
+596
 percentage-of-solo-runners
 percentage-of-solo-runners
 0
 100
 50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+5
+453
+178
+486
+number-of-groups
+number-of-groups
+0
+5
+5.0
 1
 1
 NIL
