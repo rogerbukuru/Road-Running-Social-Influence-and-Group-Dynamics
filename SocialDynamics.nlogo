@@ -236,6 +236,7 @@ to set-speed [generated-speed]
    ; Convert adjusted seconds back to a fraction of a minute and add to minutes
    set current-speed minutes + (adjusted-seconds / 100)
    set current-speed  current-speed * 60 ; convert speed from km/m to km/s
+   ;set current-speed max(list (4.28 * 60) min(list current-speed (8.28 * 60)))  ; Adjusted to cover 95% of the population (2 standard deviations)
 end
 
 
@@ -461,14 +462,14 @@ to update-runner-attributes
 
           ifelse social-influence-susceptibility > 0.5 [
             ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
-            set motivation motivation - 0.002
+            set motivation motivation - 0.0002
             ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
           ][
-            set motivation motivation - 0.001 ; Increased motivation decrease for highly susceptible runners
+            set motivation motivation - 0.0001 ; Increased motivation decrease for highly susceptible runners
             ;print(word "Runner " who " motivation decrease to " motivation " group id " group-id)
           ]
         ]  [
-          set motivation motivation - 0.001 ; Standard motivation decrease
+          set motivation motivation - 0.0001 ; Standard motivation decrease
         ]
       ]  [ ; In a group
         set motivation motivation - 0.0001 ; Standard motivation decrease
@@ -482,30 +483,41 @@ to update-runner-attributes
       ;set motivation max list 0 min list motivation 1
 
       ; Adjust endurance based on motivation and possibly speed
-      let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
-      set endurance endurance - endurance_decrease_rate
+
       ;print(word "Runner " who "endurance is " endurance)
       let speed-to-endurance-ratio 0
       if race-distance >= 5 and race-distance <= 10 [
        ; Middle distance run, 5km - 10km
         set speed-to-endurance-ratio 3 / 2
+        let endurance_decrease_rate 0.00001 + (0.5 - motivation) * 0.00001
+        set endurance endurance - endurance_decrease_rate
       ]
       if race-distance = 21 [
         ; Long distance run, 21km
         set speed-to-endurance-ratio 1
+        let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
+        set endurance endurance - endurance_decrease_rate
       ]
        if race-distance >= 42 [
        ; Full marathon, 42km
         set speed-to-endurance-ratio  2 / 3
+        let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
+        set endurance endurance - endurance_decrease_rate
       ]
       ; Adjust speed
       ifelse endurance <= 0 [
        drop-out
     ] [
+        ifelse endurance < 0.8 [
+                set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
+      ][
+                set-speed ( base-speed * ( endurance * speed-to-endurance-ratio) )
+      ]
 ;        if group-id = 0 [ ; Not in a group
 ;          print(word "Runner " who " base speed " base-speed "current speed " current-speed)
+;                    print(word "Runner " who " endurance " endurance )
 ;        ]
-        set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
+
         ;if ticks mod 60 = 0 [ ; Log every 60 ticks as an example
          ; print (word "Runner " who " current speed: " (current-speed / 60) " m/km, total distance: " total-distance " km, time: " (ticks / 60) " minutes")
         ;]
@@ -746,7 +758,7 @@ number-of-runners
 number-of-runners
 1
 20
-5.0
+10.0
 1
 1
 NIL
@@ -807,7 +819,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.5
-1
+0
 
 MONITOR
 110
