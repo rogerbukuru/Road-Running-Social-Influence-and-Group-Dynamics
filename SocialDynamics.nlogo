@@ -462,17 +462,17 @@ to update-runner-attributes
 
           ifelse social-influence-susceptibility > 0.5 [
             ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
-            set motivation motivation - 0.0002
+            set motivation motivation - 0.00002
             ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
           ][
-            set motivation motivation - 0.0001 ; Increased motivation decrease for highly susceptible runners
+            set motivation motivation - 0.00001 ; Increased motivation decrease for highly susceptible runners
             ;print(word "Runner " who " motivation decrease to " motivation " group id " group-id)
           ]
         ]  [
-          set motivation motivation - 0.0001 ; Standard motivation decrease
+          set motivation motivation - 0.00001 ; Standard motivation decrease
         ]
       ]  [ ; In a group
-        set motivation motivation - 0.0001 ; Standard motivation decrease
+        set motivation motivation - 0.00001 ; Standard motivation decrease
         let group-mates runners with [group-id = [group-id] of myself]
         let group-motivation mean [motivation] of group-mates
         ;print(word "Group motivation" group-motivation)
@@ -485,10 +485,10 @@ to update-runner-attributes
       ; Adjust endurance based on motivation and possibly speed
 
       ;print(word "Runner " who "endurance is " endurance)
-      let speed-to-endurance-ratio 0
+      let speed-to-endurance-ratio 1
       if race-distance >= 5 and race-distance <= 10 [
        ; Middle distance run, 5km - 10km
-        set speed-to-endurance-ratio 3 / 2
+        ;set speed-to-endurance-ratio 3 / 2
         let endurance_decrease_rate 0.00001 + (0.5 - motivation) * 0.00001
         set endurance endurance - endurance_decrease_rate
       ]
@@ -497,22 +497,20 @@ to update-runner-attributes
         set speed-to-endurance-ratio 1
         let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
         set endurance endurance - endurance_decrease_rate
+
       ]
        if race-distance >= 42 [
        ; Full marathon, 42km
-        set speed-to-endurance-ratio  2 / 3
-        let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
+        ;set speed-to-endurance-ratio  2 / 3
+        let endurance_decrease_rate 0.0000001 + (0.5 - motivation) * 0.0000001
         set endurance endurance - endurance_decrease_rate
       ]
       ; Adjust speed
       ifelse endurance <= 0 [
        drop-out
     ] [
-        ifelse endurance < 0.8 [
-                set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
-      ][
-                set-speed ( base-speed * ( endurance * speed-to-endurance-ratio) )
-      ]
+        set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
+
 ;        if group-id = 0 [ ; Not in a group
 ;          print(word "Runner " who " base speed " base-speed "current speed " current-speed)
 ;                    print(word "Runner " who " endurance " endurance )
@@ -535,6 +533,7 @@ to drop-out
   set color red ; Indicative of dropping out
   ; Move to a designated area or disappear from the race
   move-to one-of patches with [pcolor = green]
+  die;
 end
 
 
@@ -566,11 +565,11 @@ end
 
 to analyze-group-running-results
   if all? runners [finished-race?] [
-    let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.7 and finish-time > 0 ) ]
+    let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.5 and finish-time > 0 ) ]
     let solo-runners runners with [group-id = -1 and finish-time > 0]
     print(word "Total group runners " count group-runners)
     print(word "Total solo runners " count solo-runners)
-
+    if count runners > 0 [
     ; Use count to check if the agentset is empty
     let avg-group-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] )
     let avg-solo-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] )
@@ -595,6 +594,7 @@ to analyze-group-running-results
 
     print (word "Average group speed: " precision  avg-group-speed 2 " min/km")
     print (word "Average solo speed: " precision avg-solo-speed 2 " min/km")
+    ]
   ]
 end
 
@@ -606,15 +606,29 @@ to-report formatted-time [time-minutes]
 end
 
 
-;to-report avg-group-runner-speed
-;  let group-runners runners with [any? other runners in-radius social-influence-radius]
-;  ifelse count group-runners > 0 [
-;    report mean [speed] of group-runners
-;  ][
-;    report 0
-;  ]
-;end
-;
+to-report avg-group-runner-speed
+  let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.5 and finish-time > 0 ) ]
+  let avg-group-speed ( ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0] ) / 60
+  report precision avg-group-speed 2
+end
+
+
+to-report avg-solo-runner-speed
+  let solo-runners runners with [group-id = -1 and finish-time > 0]
+  let avg-solo-speed ( ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0] ) / 60
+  report precision avg-solo-speed 2
+end
+
+to-report running-in-group
+  let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.7 and finish-time > 0 ) ]
+  report count group-runners
+end
+
+to-report running-solo
+  let solo-runners runners with [group-id = -1 and finish-time > 0]
+  report count solo-runners
+end
+
 ;to-report avg-solo-runners-speed
 ;  let solo-runners runners with [not any? other runners in-radius social-influence-radius]
 ;  ifelse count solo-runners > 0 [
@@ -626,16 +640,16 @@ end
 
 
 
-to interact-with-nearby-spectators
-  ; Check for nearby spectators and adjust motivation based on their cheering
-  ; You can customize this based on your specific spectator influence rules
-  ; Example:
-  let nearby-spectators spectators in-radius 1
-  if any? nearby-spectators [
-    let average-cheering-intensity mean [cheering-intensity] of nearby-spectators
-    set motivation motivation * (1 - social-influence-susceptibility) + average-cheering-intensity * social-influence-susceptibility
-  ]
-end
+;to interact-with-nearby-spectators
+;  ; Check for nearby spectators and adjust motivation based on their cheering
+;  ; You can customize this based on your specific spectator influence rules
+;  ; Example:
+;  let nearby-spectators spectators in-radius 1
+;  if any? nearby-spectators [
+;    let average-cheering-intensity mean [cheering-intensity] of nearby-spectators
+;    set motivation motivation * (1 - social-influence-susceptibility) + average-cheering-intensity * social-influence-susceptibility
+;  ]
+;end
 
 to check-if-finished
   ; Check if the runner has reached the finish line
@@ -750,10 +764,10 @@ NIL
 1
 
 SLIDER
-14
-246
-192
-279
+16
+196
+194
+229
 number-of-runners
 number-of-runners
 1
@@ -773,7 +787,7 @@ number-of-spectators
 number-of-spectators
 5
 20
-20.0
+17.0
 1
 1
 NIL
@@ -794,49 +808,21 @@ number-of-pacers
 NIL
 HORIZONTAL
 
-BUTTON
-16
-173
-263
-206
-Evaluate Runner Group Formations
-fgg
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 CHOOSER
-14
-286
-152
-331
+18
+246
+156
+291
 race-distance
 race-distance
 5 10 21 42.5
-0
-
-MONITOR
-110
-508
-193
-553
-Finish Time
-formatted-time
-17
-1
-11
+3
 
 SLIDER
-0
-563
-232
-596
+13
+150
+245
+183
 percentage-of-solo-runners
 percentage-of-solo-runners
 0
@@ -847,20 +833,68 @@ percentage-of-solo-runners
 NIL
 HORIZONTAL
 
-SLIDER
-5
-453
-178
-486
-number-of-groups
-number-of-groups
-0
-5
-5.0
-1
-1
+PLOT
+949
+200
+1149
+350
+Group vs Solo Runners
 NIL
-HORIZONTAL
+NIL
+0.0
+10.0
+0.0
+20.0
+true
+false
+"" ""
+PENS
+"group runners" 1.0 0 -955883 true "" "plot count runners with [group-id = 0 ]"
+"solo runners" 1.0 0 -6459832 true "" "plot count runners with [group-id != 0 ]"
+
+MONITOR
+949
+139
+1097
+184
+Group Running Speed
+avg-group-runner-speed
+17
+1
+11
+
+MONITOR
+950
+88
+1073
+133
+Runners in Group
+running-in-group
+17
+1
+11
+
+MONITOR
+1107
+87
+1202
+132
+Solo Runners
+running-solo
+17
+1
+11
+
+MONITOR
+1106
+139
+1288
+184
+Average Solo Runner Speed
+avg-solo-runner-speed
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
