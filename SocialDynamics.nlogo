@@ -1,6 +1,7 @@
 breed [runners runner]
 breed [spectators spectator]
 breed [pacers pacer]
+breed[raindrops raindrop]
 
 runners-own [
   base-speed
@@ -53,6 +54,9 @@ to setup
 
   setup-runners total-solo-runners total-grouped-runners
   average-speed-for-group-runners
+  if running-condition = "wet"[
+    setup-rain
+  ]
   setup-spectators
   ;setup-pacers
   reset-ticks
@@ -107,7 +111,12 @@ to setup-runners [total-solo-runners total-grouped-runners]
 
     set base-speed random-normal global-base-pace global-space-sd
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
+    if running-condition = "wet" [
+       set base-speed base-speed  * 1.15
+    ]
+
     set-speed base-speed
+
     set endurance 1.0
     set motivation 1.0 ;min (list 1 max (list 0 random-normal 0.5 0.3))
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
@@ -208,18 +217,18 @@ end
 ;end
 
 
-to setup-pacers
-  create-pacers number-of-pacers [
-    set shape "person"
-    set color yellow
-    set size 1
-    set set-pace random-float 1.0
-    set visibility random-float 1.0
-    set group-size 0
-    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
-    set heading 90
-  ]
-end
+;to setup-pacers
+;  create-pacers number-of-pacers [
+;    set shape "person"
+;    set color yellow
+;    set size 1
+;    set set-pace random-float 1.0
+;    set visibility random-float 1.0
+;    set group-size 0
+;    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
+;    set heading 90
+;  ]
+;end
 
 to set-speed [generated-speed]
    ; Ensure the fractional part of the speed does not exceed .59 by converting excess seconds to minutes
@@ -240,6 +249,54 @@ to set-speed [generated-speed]
 end
 
 
+;to setup-rain
+;  if running-condition = "wet" [
+;    create-raindrops 50 [
+;      set color blue
+;      set shape "circle"
+;      set size 0.4  ; Small size for raindrops
+;      setxy random-xcor random-ycor
+;      set heading 180  ; Point downwards initially
+;    ]
+;  ]
+;end
+
+to setup-rain
+  if running-condition = "wet" [
+    create-raindrops 500 [  ; Adjust number based on desired density
+      set shape "circle"
+      set color blue
+      set size 0.5  ; Visual size of raindrops
+      ; Place raindrops randomly across the x-axis and near the top of the world
+      setxy random-xcor (max-pycor - 1)  ; Start near the top but within bounds
+      set heading 180  ; Direct them to move downward
+    ]
+  ]
+end
+
+;to move-raindrops
+;  ask raindrops [
+;    rt random 360  ; Turn in a random direction
+;    fd 0.3  ; Move forward by a small step
+;    ; Wrap the raindrops around the world edges to maintain a constant number on screen
+;    if pxcor > max-pxcor [ set xcor min-pxcor ]
+;    if pxcor < min-pxcor [ set xcor max-pxcor ]
+;    if pycor > max-pycor [ set ycor min-pycor ]
+;    if pycor < min-pycor [ set ycor max-pycor ]
+;  ]
+;end
+
+to move-raindrops
+  ask raindrops [
+    right random-float 10 - random-float 10  ; Slight random drift left or right
+    fd 0.5  ; Move slowly to simulate gentle rain
+    ; Check if raindrops go below the minimum y-coordinate and reset them
+    if pycor < min-pycor [
+      setxy random-xcor (max-pycor - 1)  ; Reset to the top just inside the world boundary
+    ]
+  ]
+end
+
 
 to go
 
@@ -251,6 +308,9 @@ to go
   ]
 
   ask runners [
+    if running-condition = "wet" [
+      move-raindrops
+    ]
     move-runners
     update-runner-attributes
     form-running-groups
@@ -489,7 +549,7 @@ to update-runner-attributes
       if race-distance >= 5 and race-distance <= 10 [
        ; Middle distance run, 5km - 10km
         ;set speed-to-endurance-ratio 3 / 2
-        let endurance_decrease_rate 0.00001 + (0.5 - motivation) * 0.00001
+        let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
         set endurance endurance - endurance_decrease_rate
       ]
       if race-distance = 21 [
@@ -522,6 +582,10 @@ to update-runner-attributes
       ]
   ]
   ]
+end
+
+to update-attributes-for-dry-weather
+
 end
 
 to drop-out
@@ -703,13 +767,13 @@ to gather-runners
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-277
-17
+306
+32
 920
-661
+647
 -1
 -1
-19.242424242424246
+18.364
 1
 10
 1
@@ -779,10 +843,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-8
-346
-194
-379
+15
+304
+201
+337
 number-of-spectators
 number-of-spectators
 5
@@ -793,35 +857,20 @@ number-of-spectators
 NIL
 HORIZONTAL
 
-SLIDER
-6
-403
-178
-436
-number-of-pacers
-number-of-pacers
-2
-100
-2.0
-1
-1
-NIL
-HORIZONTAL
-
 CHOOSER
-18
+15
 246
-156
+153
 291
 race-distance
 race-distance
 5 10 21 42.5
-3
+1
 
 SLIDER
 13
 150
-245
+217
 183
 percentage-of-solo-runners
 percentage-of-solo-runners
@@ -895,6 +944,16 @@ avg-solo-runner-speed
 17
 1
 11
+
+CHOOSER
+159
+246
+299
+291
+running-condition
+running-condition
+"dry" "wet"
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
