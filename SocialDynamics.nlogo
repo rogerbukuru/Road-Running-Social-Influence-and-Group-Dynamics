@@ -655,12 +655,15 @@ to complete-race  ; A new procedure for handling race completion.
   set finished-race? true
   set finish-time ticks / 60
   move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
+  if total-distance-in-a-group > race-distance * 0.5 [
+    set group-id 0
+  ]
   print (word "Runner " who " completed the race in " precision finish-time 2 " minutes and a speed of " precision (current-speed / 60 ) 2 " m/km. Distance in a group " precision total-distance-in-a-group 2 " km")
 end
 
 to analyze-group-running-results
   if all? runners [finished-race?] [
-    let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.5 and finish-time > 0 ) ]
+    let group-runners runners with [( group-id = 0 and finish-time > 0 )]
     let solo-runners runners with [group-id = -1 and finish-time > 0]
     print(word "Total group runners " count group-runners)
     print(word "Total solo runners " count solo-runners)
@@ -702,26 +705,51 @@ end
 
 
 to-report avg-group-runner-speed
-  let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.5 and finish-time > 0 ) ]
+  let group-runners runners with [( group-id = 0 )]
   let avg-group-speed ( ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0] ) / 60
   report precision avg-group-speed 2
 end
 
 
 to-report avg-solo-runner-speed
-  let solo-runners runners with [group-id = -1 and finish-time > 0]
+  let solo-runners runners with [group-id = -1]
   let avg-solo-speed ( ifelse-value (count solo-runners > 0) [mean [current-speed] of solo-runners] [0] ) / 60
   report precision avg-solo-speed 2
 end
 
 to-report running-in-group
-  let group-runners runners with [( group-id = 0 and finish-time > 0 ) or (total-distance-in-a-group >= race-distance * 0.7 and finish-time > 0 ) ]
+  let group-runners runners with [( group-id = 0 ) ]
   report count group-runners
 end
 
 to-report running-solo
-  let solo-runners runners with [group-id = -1 and finish-time > 0]
+  let solo-runners runners with [group-id = -1 ]
   report count solo-runners
+end
+
+to-report group-social-suspectible-runners-avg-speed
+  let social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility > 0.5)]
+  let avg-group-speed ( ifelse-value (count social-suspectible-runners > 0) [mean [current-speed] of social-suspectible-runners] [0] ) / 60
+  report avg-group-speed
+end
+
+to-report solo-social-suspectible-runners-avg-speed
+  let social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility > 0.5)]
+  let avg-solo-speed ( ifelse-value (count social-suspectible-runners > 0) [mean [current-speed] of social-suspectible-runners] [0] ) / 60
+  report avg-solo-speed
+end
+
+
+to-report group-non-social-suspectible-runners-avg-speed
+  let non-social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility <= 0.5 )]
+  let avg-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
+  report avg-group-speed
+end
+
+to-report solo-non-social-suspectible-runners-avg-speed
+  let non-social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility <= 0.5 )]
+  let solo-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
+  report solo-group-speed
 end
 
 ;to-report avg-solo-runners-speed
@@ -867,7 +895,7 @@ number-of-runners
 number-of-runners
 1
 20
-3.0
+20.0
 1
 1
 NIL
@@ -882,7 +910,7 @@ number-of-spectators
 number-of-spectators
 0
 100
-50.0
+0.0
 1
 1
 NIL
@@ -1332,6 +1360,55 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="Dry weather group runners vs solo runners and no spectators" repetitions="2" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count turtles</metric>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;dry&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Dry weather group runners vs solo runners and no spectators (10km)" repetitions="10" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>running-in-group</metric>
+    <metric>avg-group-runner-speed</metric>
+    <metric>group-social-suspectible-runners-avg-speed</metric>
+    <metric>group-non-social-suspectible-runners-avg-speed</metric>
+    <metric>running-solo</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>solo-social-suspectible-runners-avg-speed</metric>
+    <metric>solo-non-social-suspectible-runners-avg-speed</metric>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;dry&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
