@@ -54,7 +54,7 @@ to setup
 
   setup-runners total-solo-runners total-grouped-runners
   average-speed-for-group-runners
-  if running-condition = "wet"[
+  if weather = "wet"[
     setup-rain
   ]
   setup-spectators
@@ -111,8 +111,8 @@ to setup-runners [total-solo-runners total-grouped-runners]
 
     set base-speed random-normal global-base-pace global-space-sd
     set base-speed max(list 4.28 min(list base-speed 8.28))  ; Adjusted to cover 95% of the population (2 standard deviations)
-    if running-condition = "wet" [
-       set base-speed base-speed  * 1.15
+    if weather = "wet" [
+       set base-speed base-speed  * 1.15 ; decrease speed by 15%
     ]
 
     set-speed base-speed
@@ -193,9 +193,12 @@ end
 to setup-spectators
   create-spectators number-of-spectators [
     set shape "person"
-    set color blue
+    set color black
     set size 1
     set cheering-intensity random-float 1.0
+    if weather = "wet" [
+      set cheering-intensity cheering-intensity * 0.7 ; decrease cheering intensity by 30%
+    ]
     move-to one-of patches with [ pcolor = green and abs(pxcor) < 14 and abs(pycor) < 14 ]
   ]
 end
@@ -250,7 +253,7 @@ end
 
 
 ;to setup-rain
-;  if running-condition = "wet" [
+;  if weather = "wet" [
 ;    create-raindrops 50 [
 ;      set color blue
 ;      set shape "circle"
@@ -262,7 +265,7 @@ end
 ;end
 
 to setup-rain
-  if running-condition = "wet" [
+  if weather = "wet" [
     create-raindrops 500 [  ; Adjust number based on desired density
       set shape "circle"
       set color blue
@@ -308,10 +311,11 @@ to go
   ]
 
   ask runners [
-    if running-condition = "wet" [
+    if weather = "wet" [
       move-raindrops
     ]
     move-runners
+    update-spectator-cheering
     update-runner-attributes
     form-running-groups
     ;leave-group
@@ -403,6 +407,18 @@ to move-pacers
     set heading (heading + 90) mod 360
   ]
 end
+
+to update-spectator-cheering
+  ask spectators [
+    ; Increase cheering intensity as the race progresses and reset periodically
+    ifelse ticks mod 60 < 30 [  ; Assuming a cyclic pattern every minute
+      set cheering-intensity min(list 1.0 (cheering-intensity + 0.01))
+    ][
+      set cheering-intensity max(list 0.5 (cheering-intensity - 0.01))
+    ]
+  ]
+end
+
 
 to form-running-groups
 
@@ -516,23 +532,38 @@ end
 to update-runner-attributes
   ask runners [
     if not dropped-out? [
+      let motivation-decrement 0.00001
+      let social-suspectible-motivation-decrement 0.00002
+
+      if weather = "wet"[
+       set motivation-decrement 0.0001
+       set social-suspectible-motivation-decrement 0.0002
+      ]
+
       ; Adjust motivation
       ifelse group-id != 0 [ ; Not in a group
         ifelse group-runner = true [
 
           ifelse social-influence-susceptibility > 0.5 [
             ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
-            set motivation motivation - 0.00002
+            let nearby-spectators spectators in-radius 4
+            ifelse any? nearby-spectators[
+               let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
+               print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
+               set motivation motivation - social-suspectible-motivation-decrement + (avg-cheering-intensity * 0.10)
+            ][
+               set motivation motivation - social-suspectible-motivation-decrement
+            ]
             ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
           ][
-            set motivation motivation - 0.00001 ; Increased motivation decrease for highly susceptible runners
+            set motivation motivation - motivation-decrement; Increased motivation decrease for highly susceptible runners
             ;print(word "Runner " who " motivation decrease to " motivation " group id " group-id)
           ]
         ]  [
-          set motivation motivation - 0.00001 ; Standard motivation decrease
+          set motivation motivation - motivation-decrement ; Standard motivation decrease
         ]
       ]  [ ; In a group
-        set motivation motivation - 0.00001 ; Standard motivation decrease
+        set motivation motivation - motivation-decrement ; Standard motivation decrease
         let group-mates runners with [group-id = [group-id] of myself]
         let group-motivation mean [motivation] of group-mates
         ;print(word "Group motivation" group-motivation)
@@ -836,7 +867,7 @@ number-of-runners
 number-of-runners
 1
 20
-10.0
+3.0
 1
 1
 NIL
@@ -845,13 +876,13 @@ HORIZONTAL
 SLIDER
 15
 304
-201
+209
 337
 number-of-spectators
 number-of-spectators
-5
-20
-17.0
+0
+100
+50.0
 1
 1
 NIL
@@ -950,10 +981,10 @@ CHOOSER
 246
 299
 291
-running-condition
-running-condition
+weather
+weather
 "dry" "wet"
-1
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
