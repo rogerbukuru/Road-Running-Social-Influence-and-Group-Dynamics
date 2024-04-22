@@ -44,7 +44,7 @@ to setup
   clear-all
   setup-environment
   setup-race-total-laps
-  let total-solo-runners floor (number-of-runners * (percentage-of-solo-runners / 100))
+  let solo-total-runners floor (number-of-runners * (percentage-of-solo-runners / 100))
   let total-grouped-runners number-of-runners - total-solo-runners
 
   if total-grouped-runners < 2 [
@@ -89,7 +89,7 @@ to setup-race-total-laps
   ;let lap_length_in_patches track_width * 4 ; Since it's a square track, multiply by 4.
 end
 
-to setup-runners [total-solo-runners total-grouped-runners]
+to setup-runners [solo-total-runners total-grouped-runners]
   ;let x-spacing (2 * (max-pxcor - 1)) / (number-of-runners + 1)
   ;let x-pos (min-pxcor + 1 + x-spacing)
 
@@ -162,9 +162,9 @@ to setup-runners [total-solo-runners total-grouped-runners]
 
 end
 
-to place-runners-in-group [total-solo-runners]
+to place-runners-in-group [solo-total-runners]
 
-   ifelse ( who ) < total-solo-runners [
+   ifelse ( who ) < solo-total-runners [
       set group-id -1 ; indicate that these are solo runners
       set group-runner false
       set color white
@@ -703,13 +703,71 @@ to-report formatted-time [time-minutes]
   report (word minutes "m " seconds "s")
 end
 
+;;;;;;;; Group Runner Metrics
 
-to-report avg-group-runner-speed
+to-report total-runners-in-group
+  let group-runners runners with [( group-id = 0 ) ]
+  report count group-runners
+end
+
+to-report avg-group-runners-finish-time
+  let group-runners runners with [( group-id = 0 )]
+  let avg-finish-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] )
+  report precision avg-finish-time 2
+end
+
+to-report avg-group-runners-speed
   let group-runners runners with [( group-id = 0 )]
   let avg-group-speed ( ifelse-value (count group-runners > 0) [mean [current-speed] of group-runners] [0] ) / 60
   report precision avg-group-speed 2
 end
 
+
+to-report total-socially-suspectible-runners-in-group
+  let social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility > 0.5)]
+  report count social-suspectible-runners
+end
+
+to-report socially-suspectible-group-runners-avg-finish-time
+  let social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility > 0.5)]
+  let avg-finish-time ( ifelse-value (count social-suspectible-runners > 0) [mean [finish-time] of social-suspectible-runners] [0] )
+  report precision avg-finish-time 2
+end
+
+to-report socially-suspectible-group-runners-avg-speed
+  let social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility > 0.5)]
+  let avg-group-speed ( ifelse-value (count social-suspectible-runners > 0) [mean [current-speed] of social-suspectible-runners] [0] ) / 60
+  report avg-group-speed
+end
+
+
+to-report non-socially-suspectible-group-runners-avg-finish-time
+  let non-social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility <= 0.5 )]
+  let avg-finish-time ( ifelse-value (count non-social-suspectible-runners > 0) [mean [finish-time] of non-social-suspectible-runners] [0] )
+  report precision avg-finish-time 2
+end
+
+to-report non-socially-suspectible-group-runners-avg-speed
+  let non-social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility <= 0.5 )]
+  let avg-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
+  report avg-group-speed
+end
+
+
+
+
+;;;;;;;;; Solo Runner Metrics ;;;;;;;;;;;;;
+
+to-report total-solo-runners
+  let solo-runners runners with [group-id = -1 ]
+  report count solo-runners
+end
+
+to-report avg-solo-runner-finish-time
+  let solo-runners runners with [( group-id = -1 )]
+  let avg-finish-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] )
+  report precision avg-finish-time 2
+end
 
 to-report avg-solo-runner-speed
   let solo-runners runners with [group-id = -1]
@@ -717,40 +775,39 @@ to-report avg-solo-runner-speed
   report precision avg-solo-speed 2
 end
 
-to-report running-in-group
-  let group-runners runners with [( group-id = 0 ) ]
-  report count group-runners
+
+to-report total-solo-socially-suspectible-runners
+  let social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility > 0.5)]
+  report count social-suspectible-runners
 end
 
-to-report running-solo
-  let solo-runners runners with [group-id = -1 ]
-  report count solo-runners
+to-report socially-suspectible-solo-runners-avg-finish-time
+  let social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility > 0.5)]
+  let avg-finish-time ( ifelse-value (count social-suspectible-runners > 0) [mean [finish-time] of social-suspectible-runners] [0] )
+  report precision avg-finish-time 2
 end
 
-to-report group-social-suspectible-runners-avg-speed
-  let social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility > 0.5)]
-  let avg-group-speed ( ifelse-value (count social-suspectible-runners > 0) [mean [current-speed] of social-suspectible-runners] [0] ) / 60
-  report avg-group-speed
-end
 
-to-report solo-social-suspectible-runners-avg-speed
+to-report socially-suspectible-solo-runners-avg-speed
   let social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility > 0.5)]
   let avg-solo-speed ( ifelse-value (count social-suspectible-runners > 0) [mean [current-speed] of social-suspectible-runners] [0] ) / 60
   report avg-solo-speed
 end
 
 
-to-report group-non-social-suspectible-runners-avg-speed
-  let non-social-suspectible-runners runners with [(group-id = 0 and social-influence-susceptibility <= 0.5 )]
-  let avg-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
-  report avg-group-speed
+to-report non-socially-suspectible-solo-runners-avg-finish-time
+  let non-social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility <= 0.5 )]
+  let avg-finish-time ( ifelse-value (count non-social-suspectible-runners > 0) [mean [finish-time] of non-social-suspectible-runners] [0] )
+  report precision avg-finish-time 2
 end
 
-to-report solo-non-social-suspectible-runners-avg-speed
+to-report non-social-suspectible-solo-runners-avg-speed
   let non-social-suspectible-runners runners with [(group-id = -1 and social-influence-susceptibility <= 0.5 )]
   let solo-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
   report solo-group-speed
 end
+
+
 
 ;to-report avg-solo-runners-speed
 ;  let solo-runners runners with [not any? other runners in-radius social-influence-radius]
@@ -963,10 +1020,10 @@ PENS
 MONITOR
 949
 139
-1097
+1124
 184
-Group Running Speed
-avg-group-runner-speed
+Avg Group Runners Speed
+avg-group-runners-speed
 17
 1
 11
@@ -974,10 +1031,10 @@ avg-group-runner-speed
 MONITOR
 950
 88
-1073
+1107
 133
-Runners in Group
-running-in-group
+Total Runners in Group
+total-runners-in-group
 17
 1
 11
@@ -985,10 +1042,10 @@ running-in-group
 MONITOR
 1107
 87
-1202
+1236
 132
-Solo Runners
-running-solo
+Total Solo Runners
+total-solo-runners
 17
 1
 11
@@ -1361,37 +1418,25 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="Dry weather group runners vs solo runners and no spectators" repetitions="2" runMetricsEveryStep="true">
-    <setup>setup</setup>
-    <go>go</go>
-    <metric>count turtles</metric>
-    <enumeratedValueSet variable="percentage-of-solo-runners">
-      <value value="50"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="race-distance">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="number-of-runners">
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="number-of-spectators">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="weather">
-      <value value="&quot;dry&quot;"/>
-    </enumeratedValueSet>
-  </experiment>
   <experiment name="Dry weather group runners vs solo runners and no spectators (10km)" repetitions="10" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
-    <metric>running-in-group</metric>
-    <metric>avg-group-runner-speed</metric>
-    <metric>group-social-suspectible-runners-avg-speed</metric>
-    <metric>group-non-social-suspectible-runners-avg-speed</metric>
-    <metric>running-solo</metric>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
     <metric>avg-solo-runner-speed</metric>
-    <metric>solo-social-suspectible-runners-avg-speed</metric>
-    <metric>solo-non-social-suspectible-runners-avg-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
     <enumeratedValueSet variable="percentage-of-solo-runners">
       <value value="50"/>
     </enumeratedValueSet>
