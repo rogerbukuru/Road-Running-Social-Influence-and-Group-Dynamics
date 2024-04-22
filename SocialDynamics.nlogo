@@ -45,14 +45,14 @@ to setup
   setup-environment
   setup-race-total-laps
   let solo-total-runners floor (number-of-runners * (percentage-of-solo-runners / 100))
-  let total-grouped-runners number-of-runners - total-solo-runners
+  let total-grouped-runners number-of-runners - solo-total-runners
 
   if total-grouped-runners < 2 [
     user-message "Not enough runners to form a group. Increase total runners or decrease solo-runner-percent."
     stop
   ]
 
-  setup-runners total-solo-runners total-grouped-runners
+  setup-runners solo-total-runners total-grouped-runners
   average-speed-for-group-runners
   if weather = "wet"[
     setup-rain
@@ -155,7 +155,7 @@ to setup-runners [solo-total-runners total-grouped-runners]
     set heading 0
     set total-distance-in-a-group 0
     ;set x-pos (x-pos + x-spacing)
-    place-runners-in-group  total-solo-runners
+    place-runners-in-group  solo-total-runners
 
   ]
 
