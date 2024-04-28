@@ -542,28 +542,33 @@ to update-runner-attributes
 
       ; Adjust motivation
       ifelse group-id != 0 [ ; Not in a group
-        ifelse group-runner = true [
-
           ifelse social-influence-susceptibility > 0.5 [
             ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
+            set motivation motivation - social-suspectible-motivation-decrement
             let nearby-spectators spectators in-radius 4
-            ifelse any? nearby-spectators[
+            if any? nearby-spectators[
                let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
                ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
-               set motivation motivation - social-suspectible-motivation-decrement + (avg-cheering-intensity * 0.10)
-            ][
-               set motivation motivation - social-suspectible-motivation-decrement
+               set motivation motivation + (avg-cheering-intensity * 0.0001)
             ]
             ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
           ][
-            set motivation motivation - motivation-decrement + (avg-cheering-intensity * 0.05); Increased motivation decrease for highly susceptible runners
-            ;print(word "Runner " who " motivation decrease to " motivation " group id " group-id)
+            set motivation motivation - motivation-decrement
+            let nearby-spectators spectators in-radius 4
+            if any? nearby-spectators[
+               let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
+               ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
+               set motivation motivation + (avg-cheering-intensity * 0.00005)
+            ]
           ]
-        ]  [
-          set motivation motivation - motivation-decrement ; Standard motivation decrease
-        ]
       ]  [ ; In a group
         set motivation motivation - motivation-decrement ; Standard motivation decrease
+        let nearby-spectators spectators in-radius 4
+        if any? nearby-spectators[
+           let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
+           ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
+           set motivation motivation + (avg-cheering-intensity * 0.00005)
+        ]
         let group-mates runners with [group-id = [group-id] of myself]
         let group-motivation mean [motivation] of group-mates
         ;print(word "Group motivation" group-motivation)
