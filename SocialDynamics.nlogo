@@ -536,8 +536,8 @@ to update-runner-attributes
       let social-suspectible-motivation-decrement 0.00002
 
       if weather = "wet"[
-       set motivation-decrement 0.0001
-       set social-suspectible-motivation-decrement 0.0002
+       set motivation-decrement 0.00005
+       set social-suspectible-motivation-decrement 0.00004
       ]
 
       ; Adjust motivation
@@ -591,7 +591,7 @@ to update-runner-attributes
       if race-distance = 21 [
         ; Long distance run, 21km
         set speed-to-endurance-ratio 1
-        let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
+        let endurance_decrease_rate 0.0000001 + (0.5 - motivation) * 0.0000001
         set endurance endurance - endurance_decrease_rate
 
       ]
@@ -844,48 +844,6 @@ to check-if-finished
     stop
   ]
 end
-
-to interact-with-nearby-pacers
-  ; Check for nearby pacers and decide whether to follow them
-  ; You can customize this based on your specific pacer influence rules
-  ; Example:
-  let nearby-pacers pacers in-radius social-influence-radius
-  if any? nearby-pacers and not following-pacer? [
-    let most-visible-pacer max-one-of nearby-pacers [visibility]
-    if random-float 1.0 < [visibility] of most-visible-pacer [
-      set following-pacer? true
-      set current-speed [set-pace] of most-visible-pacer
-      ask most-visible-pacer [set group-size group-size + 1]
-    ]
-  ]
-end
-
-to maintain-pace
-  ; Pacers maintain their set pace and slightly adjust to support runner needs
-  ; You can customize this based on your specific pacer behavior rules
-  ; Example:
-  fd set-pace
-  if group-size > 0 [
-    let average-runner-speed mean [current-speed] of runners with [following-pacer? and distance myself < social-influence-radius]
-    set set-pace set-pace * 0.9 + average-runner-speed * 0.1
-  ]
-end
-
-to gather-runners
-  ; Pacers encourage nearby runners to join their group
-  ; You can customize this based on your specific pacer-runner interaction rules
-  ; Example:
-  let nearby-runners runners in-radius social-influence-radius with [not following-pacer?]
-  if any? nearby-runners [
-    ask nearby-runners [
-      if random-float 1.0 < [visibility] of myself [
-        set following-pacer? true
-        set current-speed [set-pace] of myself
-        ask myself [set group-size group-size + 1]
-      ]
-    ]
-  ]
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
 306
@@ -972,7 +930,7 @@ number-of-spectators
 number-of-spectators
 0
 100
-50.0
+0.0
 1
 1
 NIL
@@ -986,7 +944,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.2
-1
+2
 
 SLIDER
 13
@@ -1709,6 +1667,294 @@ NetLogo 6.4.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="weather">
       <value value="&quot;dry&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and no spectators (5km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and no spectators (10km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and no spectators (21km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="21"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and no spectators (42.2km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="42.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and spectators (5km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and spectators (10km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and spectators (21km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="21"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="Wet weather group runners vs solo runners and spectators (42.2km)" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>total-runners-in-group</metric>
+    <metric>avg-group-runners-finish-time</metric>
+    <metric>avg-group-runners-speed</metric>
+    <metric>total-socially-suspectible-runners-in-group</metric>
+    <metric>socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-group-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-group-runners-avg-finish-time</metric>
+    <metric>non-socially-suspectible-group-runners-avg-speed</metric>
+    <metric>total-solo-runners</metric>
+    <metric>avg-solo-runner-finish-time</metric>
+    <metric>avg-solo-runner-speed</metric>
+    <metric>total-solo-socially-suspectible-runners</metric>
+    <metric>socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>socially-suspectible-solo-runners-avg-speed</metric>
+    <metric>non-socially-suspectible-solo-runners-avg-finish-time</metric>
+    <metric>non-social-suspectible-solo-runners-avg-speed</metric>
+    <runMetricsCondition>all? runners [finished-race? or dropped-out?]</runMetricsCondition>
+    <enumeratedValueSet variable="percentage-of-solo-runners">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="race-distance">
+      <value value="42.2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-runners">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="number-of-spectators">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="weather">
+      <value value="&quot;wet&quot;"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>
