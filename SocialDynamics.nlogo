@@ -58,19 +58,16 @@ to setup
     setup-rain
   ]
   setup-spectators
-  ;setup-pacers
   reset-ticks
 end
 
 
 to setup-environment
-  ; Set all patches to represent the road
+  ; All patches to represent the road
   ask patches [ set pcolor gray ]
 
-  ; Define the central lawn area
+  ; Central lawn area
   ask patches with [ abs(pycor) < 12 and abs(pxcor) < 12 ] [ set pcolor green ]
-    ; Assuming the start/finish line is 5 patches long for demonstration.
-  ; This line starts from the bottom left corner of the lawn and extends right.
   let start-finish-line-length 6
   ask patches with [pycor = -11 and pxcor >= -16 and pxcor < (-16 + start-finish-line-length)] [
     set pcolor ifelse-value (pxcor mod 2 = 0) [black] [white]
@@ -82,31 +79,20 @@ end
 to setup-race-total-laps
   set laps-required race-distance / 1
   set lap-length-in-patches (33 * 4)
-  ; Assuming total width of the environment (T) and width of the lawn (W)
-  ;let total-width 32 ; This would be the total width from one end to the other of the environment.
-  ;let lawn-width 24 ; This is the width of the lawn, so 12 patches from the center to each side.
-  ;let track_width (total-width - lawn-width) / 2 ; This calculates the width of the track itself.
-  ;let lap_length_in_patches track_width * 4 ; Since it's a square track, multiply by 4.
 end
 
 to setup-runners [solo-total-runners total-grouped-runners]
-  ;let x-spacing (2 * (max-pxcor - 1)) / (number-of-runners + 1)
-  ;let x-pos (min-pxcor + 1 + x-spacing)
 
-  let start-line-y -11 ; Adjust based on your track setup
+  let start-line-y -11
   let start-line-x-start -16
-  let start-line-length 0.5  ; Length of your start line
+  let start-line-length 0.5
 
-  ; Calculate spacing if needed, to distribute runners along the start line.
-  let spacing number-of-runners / start-line-length   ; This could be adjusted based on the number of runners and the length of the start line.
-
+  let spacing number-of-runners / start-line-length
   let global-base-pace 6.28 ; average global base pace in minutes per km
   let global-space-sd 1     ;standard deviation for variability in pace
 
   create-runners number-of-runners [
-    ;print(word "Number of runners:" number-of-runners)
     set shape "person"
-    ;set color brown
     set size 1.5
 
     set base-speed random-normal global-base-pace global-space-sd
@@ -114,47 +100,22 @@ to setup-runners [solo-total-runners total-grouped-runners]
     if weather = "wet" [
        set base-speed base-speed  * 1.15 ; decrease speed by 15%
     ]
-
     set-speed base-speed
-
     set endurance 1.0
-    set motivation 1.0 ;min (list 1 max (list 0 random-normal 0.5 0.3))
+    set motivation 1.0
     set social-influence-susceptibility min (list 1 max (list 0 random-normal 0.5 0.3))
-      ; Assign colors based on social-influence-susceptibility
-    let q1 0.25  ; 25th percentile
-    let q2 0.75  ; 75th percentile
-
-;    ifelse social-influence-susceptibility <= q1 [
-;      set color violet  ; Runners within the 25th percentile are violet
-;      set social-influence-susceptibility-quantile "first"
-;    ] [
-;      ifelse social-influence-susceptibility <= q2 [
-;        set color brown  ; Runners between the 25th and 75th percentile are brown
-;        set social-influence-susceptibility-quantile "average"
-;      ] [
-;        set color orange  ; Runners above the 75th percentile are orange
-;        set social-influence-susceptibility-quantile "third"
-;      ]
-;    ]
-
     set finish-time 0
-    ;set speed-consistency 0
     set dropped-out? false
-    ;setxy x-pos (min-pycor + 1)
-    ;move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -12 ]
     set laps-completed 0
     set total-distance 0
-    set just-crossed-line? true  ; Prevent initial lap increase.
-
+    set just-crossed-line? true  ; To prevent initial lap increase.
     ; Position runners on the start line.
     let assigned-x start-line-x-start + (who mod start-line-length) * spacing
     let assigned-y start-line-y
     setxy assigned-x assigned-y
-    ;print(word "Runner starting x position: " pxcor " and y position: " pycor)
     set finished-race? false
     set heading 0
     set total-distance-in-a-group 0
-    ;set x-pos (x-pos + x-spacing)
     place-runners-in-group  solo-total-runners
 
   ]
@@ -203,35 +164,6 @@ to setup-spectators
   ]
 end
 
-;to distribute-extra-runners [extra-runners]
-;  let start-index total-solo-runners + (runners-per-group * number-of-groups)
-;  ask n-of extra-runners runners with [who >= start-index] [
-;    let new-group-id random number-of-groups
-;    set group-id new-group-id
-;    set color scale-color red new-group-id 0 number-of-groups - 1
-;  ]
-;end
-;
-;to check-groups [extra-runners]
-;  if any? groups with [count runners with [group-id = [group-id] of myself] < 2] [
-;    user-message "One or more groups have fewer than two runners. Adjusting runner distribution..."
-;    distribute-extra-runners extra-runners ; Define this procedure to handle redistribution
-;  ]
-;end
-
-
-;to setup-pacers
-;  create-pacers number-of-pacers [
-;    set shape "person"
-;    set color yellow
-;    set size 1
-;    set set-pace random-float 1.0
-;    set visibility random-float 1.0
-;    set group-size 0
-;    move-to one-of patches with [ pcolor = gray and pxcor = -15 and pycor = -15 ]
-;    set heading 90
-;  ]
-;end
 
 to set-speed [generated-speed]
    ; Ensure the fractional part of the speed does not exceed .59 by converting excess seconds to minutes
@@ -248,28 +180,16 @@ to set-speed [generated-speed]
    ; Convert adjusted seconds back to a fraction of a minute and add to minutes
    set current-speed minutes + (adjusted-seconds / 100)
    set current-speed  current-speed * 60 ; convert speed from km/m to km/s
-   ;set current-speed max(list (4.28 * 60) min(list current-speed (8.28 * 60)))  ; Adjusted to cover 95% of the population (2 standard deviations)
+
 end
 
 
-;to setup-rain
-;  if weather = "wet" [
-;    create-raindrops 50 [
-;      set color blue
-;      set shape "circle"
-;      set size 0.4  ; Small size for raindrops
-;      setxy random-xcor random-ycor
-;      set heading 180  ; Point downwards initially
-;    ]
-;  ]
-;end
-
 to setup-rain
   if weather = "wet" [
-    create-raindrops 500 [  ; Adjust number based on desired density
+    create-raindrops 500 [
       set shape "circle"
       set color blue
-      set size 0.5  ; Visual size of raindrops
+      set size 0.5
       ; Place raindrops randomly across the x-axis and near the top of the world
       setxy random-xcor (max-pycor - 1)  ; Start near the top but within bounds
       set heading 180  ; Direct them to move downward
@@ -277,25 +197,13 @@ to setup-rain
   ]
 end
 
-;to move-raindrops
-;  ask raindrops [
-;    rt random 360  ; Turn in a random direction
-;    fd 0.3  ; Move forward by a small step
-;    ; Wrap the raindrops around the world edges to maintain a constant number on screen
-;    if pxcor > max-pxcor [ set xcor min-pxcor ]
-;    if pxcor < min-pxcor [ set xcor max-pxcor ]
-;    if pycor > max-pycor [ set ycor min-pycor ]
-;    if pycor < min-pycor [ set ycor max-pycor ]
-;  ]
-;end
 
 to move-raindrops
   ask raindrops [
     right random-float 10 - random-float 10  ; Slight random drift left or right
     fd 0.5  ; Move slowly to simulate gentle rain
-    ; Check if raindrops go below the minimum y-coordinate and reset them
     if pycor < min-pycor [
-      setxy random-xcor (max-pycor - 1)  ; Reset to the top just inside the world boundary
+      setxy random-xcor (max-pycor - 1)
     ]
   ]
 end
@@ -318,26 +226,14 @@ to go
     update-spectator-cheering
     update-runner-attributes
     form-running-groups
-    ;leave-group
-    ;check-if-dropped-out
-    ;interact-with-nearby-spectators
-    ;interact-with-nearby-pacers
-    ;check-if-finished
   ]
-;  ask pacers [
-;    move-pacers
-;    maintain-pace
-;    gather-runners
-;  ]
   tick
 end
 
 to move-runners
   ; Detect potential collision directly ahead and calculate available space for lateral movement.
-  ;ask runners [
+
   if not finished-race?[
-
-
   let ahead-patch patch-ahead 1
   let collision-ahead? any? other runners with [patch-here = ahead-patch]
 
@@ -358,18 +254,13 @@ to move-runners
 
 
     let patches-per-tick lap-length-in-patches / current-speed
-    ;print(word "Runner: " who " is running at " patches-per-tick " patches per tick")
+
     fd patches-per-tick ;current-speed ;
     let distance-per-tick (1 / current-speed) ; Distance covered in 1 tick (minute), in kilometers
-    ;print(word "Distance per tick " distance-per-tick)
     set total-distance total-distance + distance-per-tick
-    ;print(word "Distance traveled " total-distance)
-     ;if social-influence-susceptibility > 0.5 [
-     calculate-distance-in-group distance-per-tick
-    ;]
+    calculate-distance-in-group distance-per-tick
 
     update-laps-completed
-    ; Adjust heading at track boundaries to stay within the track.
     adjust-heading-at-boundaries
   ]
   ;]
@@ -377,7 +268,6 @@ end
 
 ; Helper procedure to move runners laterally without direct xcor/ycor manipulation.
 to move-laterally [dir]
-  ; dir is -1 for left, 1 for right
   right dir * 90
   fd 1
   left dir * 90
@@ -395,23 +285,10 @@ end
 
 
 
-
-to move-pacers
-  ; Move the pacer forward in the direction it's facing
-  fd set-pace
-  ; Check if the pacer needs to turn based on its current position and heading
-  if (pxcor = 15 and heading = 90) or (pxcor = -15 and heading = 270) [
-    set heading (heading + 90) mod 360
-  ]
-  if (pycor = 15 and heading = 0) or (pycor = -15 and heading = 180) [
-    set heading (heading + 90) mod 360
-  ]
-end
-
 to update-spectator-cheering
   ask spectators [
     ; Increase cheering intensity as the race progresses and reset periodically
-    ifelse ticks mod 60 < 30 [  ; Assuming a cyclic pattern every minute
+    ifelse ticks mod 60 < 30 [  ; We assume a cyclic pattern every minute
       set cheering-intensity min(list 1.0 (cheering-intensity + 0.01))
     ][
       set cheering-intensity max(list 0.5 (cheering-intensity - 0.01))
@@ -422,9 +299,8 @@ end
 
 to form-running-groups
 
- ; Check if the runner's social-influence-susceptibility is high enough to form a group
-  ;print(word "Social influence" social-influence-susceptibility)
   if not finished-race? and group-runner [
+  ; Check if the runner's social-influence-susceptibility is high enough to form a group
   ifelse social-influence-susceptibility > 0.5 [
       ; Check for nearby runners based on distance
       let nearby-runners other runners in-radius 2 with [group-runner = true]
@@ -436,11 +312,9 @@ to form-running-groups
 
       ; If the speed difference is within the tolerance range
       if speed-diff <= 0.1 [
-           ;print("Forming group")
         ; Form a group and change color to pink
         set color pink
         set group-id 0
-        ;set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
         ask closest-runner [
           set color pink
           set group-id 0
@@ -448,32 +322,20 @@ to form-running-groups
       ]
 
     ][
-    ; If the runner is pink and there are no other pink runners within a certain radius
-;    if color = pink and not any? other runners in-radius 3 with [color = pink] [
-;        ; instead of immediately reverting color, mark this runner for reversion
-;        set group-id -2  ; Using -2 as an example mark for reversion
-;        ;revert-color-based-on-quantile
-;      ]
-        ;print(word "Runner " who " dropped out of group")
         set group-id -2
 
     ]
 
-    ; Now, revert color for all marked runners collectively
     ask runners with [group-id = -2] [
     ; Revert color based on social-influence-susceptibility-quantile
     revert-color-based-on-quantile
-    ; Reset group-id back to -1 indicating they are no longer in a group
+    ; Reset group-id back to -1 indicating runner is no longer in a group
     set group-id -1
   ]
 
   ][
-
-    ; If the runner is pink and there are no other pink runners within a certain radius
     if color = pink and not any? other runners in-radius 4 with [color = pink] [
-        ; instead of immediately reverting color, mark this runner for reversion
-        set group-id -2  ; Using -2 as an example mark for reversion
-        ;revert-color-based-on-quantile
+        set group-id -2
       ]
 
   ]
@@ -481,31 +343,7 @@ to form-running-groups
 
 end
 
-to leave-group
-  if not finished-race? and group-runner = true and group-id != 0 [
 
-   print(word "Runner " who " dropped out of group, social influence" social-influence-susceptibility)
-;      ifelse any? nearby-runners [
-;      ; Find the runner with the closest speed
-;      let closest-runner min-one-of nearby-runners [abs (current-speed - [current-speed] of myself)]
-;      let closest-speed [current-speed] of closest-runner
-;      let speed-diff abs (current-speed - closest-speed)
-;
-;      ; If the speed difference is within the tolerance range
-;      if speed-diff <= 0.1 [
-;           ;print("Forming group")
-;        ; Form a group and change color to pink
-;        set color pink
-;        set group-id 1
-;        ;set group-id [group-id] of closest-runner ; group id of closet runner is currently -1
-;        ask closest-runner [
-;          set color pink
-;          set group-id 1
-;        ]
-;      ]
-;    ]
-  ]
-end
 
 to revert-color-based-on-quantile
   ; Change color back to the original color based on social-influence-susceptibility quantile
@@ -529,6 +367,7 @@ to calculate-distance-in-group[distance-covered]
   ]
 
 end
+
 to update-runner-attributes
   ask runners [
     if not dropped-out? [
@@ -543,21 +382,17 @@ to update-runner-attributes
       ; Adjust motivation
       ifelse group-id != 0 [ ; Not in a group
           ifelse social-influence-susceptibility > 0.5 [
-            ;print(word "Runner(social) " who " current motivation " motivation " group id " group-id)
             set motivation motivation - social-suspectible-motivation-decrement
             let nearby-spectators spectators in-radius 4
             if any? nearby-spectators[
                let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
-               ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
                set motivation motivation + (avg-cheering-intensity * 0.0001)
             ]
-            ;print(word "Runner(social) " who " motivation decrease to " motivation " group id " group-id)
           ][
             set motivation motivation - motivation-decrement
             let nearby-spectators spectators in-radius 4
             if any? nearby-spectators[
                let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
-               ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
                set motivation motivation + (avg-cheering-intensity * 0.00005)
             ]
           ]
@@ -566,39 +401,28 @@ to update-runner-attributes
         let nearby-spectators spectators in-radius 4
         if any? nearby-spectators[
            let avg-cheering-intensity mean [cheering-intensity] of nearby-spectators
-           ;print(word "Found nearby fans adding to motivation " (avg-cheering-intensity * 0.10))
            set motivation motivation + (avg-cheering-intensity * 0.00005)
         ]
         let group-mates runners with [group-id = [group-id] of myself]
         let group-motivation mean [motivation] of group-mates
-        ;print(word "Group motivation" group-motivation)
         set motivation (motivation + group-motivation) / 2 ; Adjust motivation towards group average
       ]
 
-      ; Ensure motivation stays within bounds
-      ;set motivation max list 0 min list motivation 1
-
-      ; Adjust endurance based on motivation and possibly speed
-
-      ;print(word "Runner " who "endurance is " endurance)
       let speed-to-endurance-ratio 1
       if race-distance >= 5 and race-distance <= 10 [
        ; Middle distance run, 5km - 10km
-        ;set speed-to-endurance-ratio 3 / 2
         let endurance_decrease_rate 0.000001 + (0.5 - motivation) * 0.000001
         set endurance endurance - endurance_decrease_rate
       ]
       if race-distance = 21 [
         ; Long distance run, 21km
-        set speed-to-endurance-ratio 1
         let endurance_decrease_rate 0.0000001 + (0.5 - motivation) * 0.0000001
         set endurance endurance - endurance_decrease_rate
 
       ]
        if race-distance >= 42 [
        ; Full marathon, 42km
-        ;set speed-to-endurance-ratio  2 / 3
-        let endurance_decrease_rate 0.0000001 + (0.5 - motivation) * 0.0000001
+        let endurance_decrease_rate 0.00000001 + (0.5 - motivation) * 0.00000001
         set endurance endurance - endurance_decrease_rate
       ]
       ; Adjust speed
@@ -606,23 +430,12 @@ to update-runner-attributes
        drop-out
     ] [
         set-speed ( base-speed / ( endurance * speed-to-endurance-ratio) )
-
-;        if group-id = 0 [ ; Not in a group
-;          print(word "Runner " who " base speed " base-speed "current speed " current-speed)
-;                    print(word "Runner " who " endurance " endurance )
-;        ]
-
-        ;if ticks mod 60 = 0 [ ; Log every 60 ticks as an example
-         ; print (word "Runner " who " current speed: " (current-speed / 60) " m/km, total distance: " total-distance " km, time: " (ticks / 60) " minutes")
-        ;]
       ]
   ]
   ]
 end
 
-to update-attributes-for-dry-weather
 
-end
 
 to drop-out
 
@@ -642,12 +455,7 @@ end
 to update-laps-completed
   ask runners [
     let laps-completed-before laps-completed
-    ;print(word "Laps completed before " laps-completed-before)
     set laps-completed floor ((total-distance * lap-length-in-patches)  / lap-length-in-patches)
-    ;print(word "Laps completed " laps-completed)
-    if laps-completed > laps-completed-before [
-      ;print (word "Runner " who " has completed lap " laps-completed " at tick: " ticks)
-    ]
     if laps-completed >= laps-required and not finished-race? [
       complete-race
     ]
@@ -655,11 +463,10 @@ to update-laps-completed
 end
 
 
-to complete-race  ; A new procedure for handling race completion.
-  ; Assuming 1 tick = 1 minute for simplicity, adjust as necessary.
+to complete-race
   set finished-race? true
   set finish-time ticks / 60
-  move-to one-of patches with [pcolor = green]  ; Move completed runners off the track.
+  move-to one-of patches with [pcolor = green] ; Move completed runners off the track.
   if total-distance-in-a-group > race-distance * 0.5 [
     set group-id 0
   ]
@@ -673,7 +480,6 @@ to analyze-group-running-results
     print(word "Total group runners " count group-runners)
     print(word "Total solo runners " count solo-runners)
     if count runners > 0 [
-    ; Use count to check if the agentset is empty
     let avg-group-time ( ifelse-value (count group-runners > 0) [mean [finish-time] of group-runners] [0] )
     let avg-solo-time ( ifelse-value (count solo-runners > 0) [mean [finish-time] of solo-runners] [0] )
 
@@ -701,7 +507,7 @@ to analyze-group-running-results
   ]
 end
 
-; Assuming finish-time is in minutes
+
 to-report formatted-time [time-minutes]
   let minutes floor time-minutes
   let seconds round (time-minutes - minutes) * 60
@@ -811,39 +617,6 @@ to-report non-social-suspectible-solo-runners-avg-speed
   let solo-group-speed ( ifelse-value (count non-social-suspectible-runners > 0) [mean [current-speed] of non-social-suspectible-runners] [0] ) / 60
   report solo-group-speed
 end
-
-
-
-;to-report avg-solo-runners-speed
-;  let solo-runners runners with [not any? other runners in-radius social-influence-radius]
-;  ifelse count solo-runners > 0 [
-;    report mean [speed] of solo-runners
-;  ][
-;    report 0
-;  ]
-;end
-
-
-
-;to interact-with-nearby-spectators
-;  ; Check for nearby spectators and adjust motivation based on their cheering
-;  ; You can customize this based on your specific spectator influence rules
-;  ; Example:
-;  let nearby-spectators spectators in-radius 1
-;  if any? nearby-spectators [
-;    let average-cheering-intensity mean [cheering-intensity] of nearby-spectators
-;    set motivation motivation * (1 - social-influence-susceptibility) + average-cheering-intensity * social-influence-susceptibility
-;  ]
-;end
-
-to check-if-finished
-  ; Check if the runner has reached the finish line
-  if pycor = max-pycor [
-    set color green
-    ;die
-    stop
-  ]
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
 306
@@ -873,11 +646,11 @@ ticks
 30.0
 
 BUTTON
-25
-78
-91
-111
-NIL
+7
+277
+73
+310
+Setup
 setup
 NIL
 1
@@ -890,11 +663,11 @@ NIL
 1
 
 BUTTON
-110
-77
-173
-110
-Go
+92
+278
+185
+311
+Start Race
 go
 T
 1
@@ -907,25 +680,25 @@ NIL
 1
 
 SLIDER
-16
-196
-194
-229
+14
+117
+192
+150
 number-of-runners
 number-of-runners
 1
 20
-20.0
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-15
-304
-209
-337
+11
+215
+205
+248
 number-of-spectators
 number-of-spectators
 0
@@ -937,20 +710,20 @@ NIL
 HORIZONTAL
 
 CHOOSER
-15
-246
-153
-291
+8
+46
+146
+91
 race-distance
 race-distance
 5 10 21 42.2
-2
+0
 
 SLIDER
 13
-150
+168
 217
-183
+201
 percentage-of-solo-runners
 percentage-of-solo-runners
 0
@@ -1025,10 +798,10 @@ avg-solo-runner-speed
 11
 
 CHOOSER
-159
-246
-299
-291
+152
+46
+292
+91
 weather
 weather
 "dry" "wet"
@@ -1037,39 +810,62 @@ weather
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+This simulation investigates the impact of various social dynamics on non-professional runners during road running events. It compares the effectiveness of group running versus solo running under the influences of race distance, weather conditions, external spectators, and individual social inclinations. The goal is to examine how these factors affect the performance differences between group and solo runners and the sustainability of running groups under different conditions.
 
 ## HOW IT WORKS
 
-(what rules the agents use to create the overall behavior of the model)
+The model simulates a running event with agents representing runners, spectators, and environmental elements such as rain. Each runner’s performance is influenced by dynamic factors including endurance, motivation, and social susceptibility, which change based on interactions and running conditions. Runners can be part of a group or run solo, with their state influencing their motivation and performance metrics.
+
+- **Runner Colors**: 
+  - **White**: Indicates solo runners who are not part of any group.
+  - **Pink**: Denotes runners who are part of a group.
+  - **Violet**: Represents runners with low social susceptibility (within the 25th percentile).
+  - **Brown**: Used for runners with average social susceptibility (between the 25th and 75th percentiles).
+  - **Orange**: Signifies runners with high social susceptibility (above the 75th percentile).
+  - **Red**: Indicates that a runner has dropped out of the race due to exhaustion or low motivation.
+
+Weather conditions (wet or dry) directly impact runners’ speeds, and spectator presence can alter runners' motivation, particularly influencing those who are socially susceptible. The speeds are expressed in m/km, with lower values indicating faster speeds, mimicking real-world amateur running paces. The interplay between motivation and endurance affects runners’ speeds and ultimately their finish times. Additionally, group dynamics can evolve with runners forming or disbanding from groups based on proximity and pace compatibility, which in turn affects their motivation levels and performance outcomes.
 
 ## HOW TO USE IT
 
-(how to use the model, including a description of each of the items in the Interface tab)
+1. **Setup**: Prepare the simulation environment, including the running track and initial placement of runners and spectators.
+2. **Sliders**: Adjust the number of runners, percentage of solo runners, number of spectators, and race distance.
+3. **Switches**: Toggle weather conditions between dry and wet.
+4. **Buttons**: Use the 'setup' button to initialize the simulation based on current settings, and the 'go' button to start the simulation.
+5. **Monitors and Plots**: Observe key metrics such as average speed, finish times, and group dynamics through the interface's monitors and plots.
 
 ## THINGS TO NOTICE
 
-(suggested things for the user to notice while running the model)
+- Observe how group dynamics influence performance outcomes across different weather conditions.
+- Notice the effect of spectators on runners with high social susceptibility.
+- Track the color changes in runners as they join groups, run solo, or drop out due to low motivation.
 
 ## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+- Vary the number of spectators and observe changes in runner motivation and performance.
+- Experiment with different distributions of solo and group runners.
+- Adjust the weather condition to see its direct impact on runners' speeds and overall race dynamics.
 
 ## EXTENDING THE MODEL
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+- Introduce varying levels of spectator enthusiasm that could dynamically change throughout the race.
+- Implement more complex weather patterns that intermittently affect different parts of the track.
+- Add more nuanced social dynamics, such as leadership within groups or rivalry between runners.
 
 ## NETLOGO FEATURES
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+- Utilizes agent-based modeling to simulate complex social interactions and environmental influences on behavior.
+- Employs sliders and switches on the interface to dynamically adjust simulation parameters.
+- Demonstrates the use of monitors and plots for real-time visualization of simulation outcomes.
 
 ## RELATED MODELS
 
-(models in the NetLogo Models Library and elsewhere which are of related interest)
+- Wolf Sheep Predation: Similar use of agent-based modeling to explore dynamics within an ecosystem.
+- Traffic Grid: Explores how individual behavior affects traffic flow, similar to runners in a race.
 
 ## CREDITS AND REFERENCES
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+This model is inspired by research into social dynamics in sports and agent-based modeling techniques for simulating amateur road running. For further information and a deeper understanding of the underlying theories, refer to sports psychology journals and publications on agent-based modeling in NetLogo.
 @#$#@#$#@
 default
 true
