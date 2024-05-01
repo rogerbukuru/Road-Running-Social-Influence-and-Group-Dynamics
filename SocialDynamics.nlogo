@@ -26,11 +26,6 @@ spectators-own [
   cheering-intensity
 ]
 
-pacers-own [
-  set-pace
-  visibility
-  group-size
-]
 
 globals [
   laps-required
