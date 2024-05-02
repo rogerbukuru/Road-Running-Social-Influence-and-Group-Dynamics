@@ -245,6 +245,7 @@ to go
 end
 
 to move-runners
+  ; Detect potential collision directly ahead and calculate available space for lateral movement.
 
   if not finished-race?[
   let ahead-patch patch-ahead 1
