@@ -796,7 +796,7 @@ CHOOSER
 race-distance
 race-distance
 5 10 21 42.2
-2
+1
 
 SLIDER
 13
@@ -807,7 +807,7 @@ percentage-of-solo-runners
 percentage-of-solo-runners
 0
 100
-50.0
+10.0
 1
 1
 NIL
@@ -837,7 +837,7 @@ MONITOR
 265
 1176
 310
-Avg Group Runners Speed
+Group Runners Average Speed
 avg-group-runners-speed
 2
 1
@@ -870,7 +870,7 @@ MONITOR
 264
 1423
 309
-Average Solo Runner Speed
+Solo Runners Average Speed
 avg-solo-runner-speed
 2
 1
