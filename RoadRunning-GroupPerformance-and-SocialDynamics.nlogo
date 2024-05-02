@@ -268,8 +268,8 @@ to move-runners
 
     let patches-per-tick lap-length-in-patches / current-speed
 
-    fd patches-per-tick ;current-speed ;
-    let distance-per-tick (1 / current-speed) ; Distance covered in 1 tick (minute), in kilometers
+    fd patches-per-tick
+    let distance-per-tick (1 / current-speed)
     set total-distance total-distance + distance-per-tick
     calculate-distance-in-group distance-per-tick
 
