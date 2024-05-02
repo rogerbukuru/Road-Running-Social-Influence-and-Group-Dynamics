@@ -1,1 +1,3 @@
 .Rproj.user
+*.temp.nlogo
+.DS_Store
