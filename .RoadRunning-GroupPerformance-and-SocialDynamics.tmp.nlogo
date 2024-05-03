@@ -245,7 +245,6 @@ to go
 end
 
 to move-runners
-  ; Detect potential collision directly ahead and calculate available space for lateral movement.
 
   if not finished-race?[
   let ahead-patch patch-ahead 1
@@ -269,8 +268,8 @@ to move-runners
 
     let patches-per-tick lap-length-in-patches / current-speed
 
-    fd patches-per-tick ;current-speed ;
-    let distance-per-tick (1 / current-speed) ; Distance covered in 1 tick (minute), in kilometers
+    fd patches-per-tick
+    let distance-per-tick (1 / current-speed)
     set total-distance total-distance + distance-per-tick
     calculate-distance-in-group distance-per-tick
 
@@ -452,8 +451,7 @@ end
 
 
 to drop-out
-
-  ; Mark the runner as dropped out
+  ;  the runner as dropped out
   set dropped-out? true
   set finish-time ticks / 60  ; Record the time in minutes at the moment of dropping out
   ;print (word "Runner " who " has dropped out at time: " precision finish-time 2 " minutes \n and speed of " precision current-speed 2 " m/km and endurance of " endurance " \n and motivation " motivation)
@@ -950,6 +948,17 @@ This simulation investigates the impact of various social dynamics on non-profes
 
 The model simulates a running event with agents representing runners and spectators. Each runner’s performance is influenced by dynamic factors including endurance, motivation, and social susceptibility, which change based on interactions and running conditions. Runners can be part of a group or run solo, with their state influencing their motivation and performance metrics. Each lap around the track is assumed to be 1km, with a lap being the distance from the start line(black and white) and back. Each tick measures a second in time.
 
+The are various runner charateristics that are assigned to runners at the beginning of a simulation:
+ 
+-  **Motivation**: 1.0
+-  **Endurance**:1.0
+-  **Speed**: Generated from a normal distribution with mean 6.28 and a standard deviation of 1 and then 2 standard deviations(captures 95% of the population) are retained and a value is assigned to a runner.
+-  **Social Susceptibility**: Generated from a normal distribution with mean 0.5 and standard deviation 0.3 and then capped to be between 0 and 1, and then this is assigned to a runner.
+
+Over the course of a race the speed of a runner changes and this is a function of endurance and motivation, so as their motivation decreases it contributes to a decrease in endurance which ultimately contributes to a fluctation in speed. Higher endurance will mean runner can maintain or increase speed and vice versa.
+
+During the race, runners can have various colours, their meanings are as follow:
+
 - **Runner Colors**: 
   - **White**: Indicates solo runners who are not part of any group.
   - **Pink**: Denotes runners who are part of a group.
@@ -960,7 +969,8 @@ The model simulates a running event with agents representing runners and spectat
 
 Weather conditions (wet or dry) directly impact runners’ speeds, and spectator presence can alter runners' motivation, particularly influencing those who are socially susceptible. The speeds are expressed in m/km (minutes per kilometer), with lower values indicating faster speeds, mimicking real-world amateur running paces. The interplay between motivation and endurance affects runners’ speeds and ultimately their finish times. Additionally, group dynamics can evolve with runners forming or disbanding from groups based on proximity and pace compatibility, which in turn affects their motivation levels and performance outcomes.
 
-Specators are placed on the lawn and cheer runners periodically to emulate real-life cheering. When runners drop out or complete a race, they are placed on the lawn. When group runners drop out of their group their change to a colour that represents their social susceptibility level.
+Specators are placed on the lawn and cheer runners periodically to emulate real-life cheering. When runners drop out or complete a race, they are placed on the lawn. When group runners drop out of their group their change to a colour that represents their social susceptibility level, solo-runners always remain in white.
+
 
 ## HOW TO USE IT
 
